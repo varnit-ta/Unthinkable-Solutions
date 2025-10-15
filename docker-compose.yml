@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:15
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-unthinkable}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-unthinkable}
+      POSTGRES_DB: ${POSTGRES_DB:-unthinkable_recipes}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgres://unthinkable:unthinkable@db:5432/unthinkable_recipes?sslmode=disable}
+      PORT: ${PORT:-8081}
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-secure-secret}
+    depends_on:
+      - db
+    ports:
+      - "8081:8081"
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  db_data:
