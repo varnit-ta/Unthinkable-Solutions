@@ -1,9 +1,9 @@
+// Package vision provides AI-powered image analysis for ingredient detection.
 package vision
 
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,57 +11,78 @@ import (
 	"time"
 )
 
-// HuggingFaceService implements VisionService using Hugging Face Inference API
+// HuggingFaceService implements VisionService using the Hugging Face Inference API.
+// It uses the BLIP-2 image captioning model which excels at food recognition.
 type HuggingFaceService struct {
-	apiKey     string
-	httpClient *http.Client
-	modelURL   string
+	apiKey     string       // Hugging Face API authentication key
+	httpClient *http.Client // HTTP client with timeout configuration
+	modelURL   string       // API endpoint URL for the vision model
 }
 
-// NewHuggingFaceService creates a new Hugging Face vision service
-// Uses the BLIP-2 model for image captioning which is excellent for food detection
+// NewHuggingFaceService creates a new Hugging Face vision service instance.
+// Uses the Salesforce BLIP image captioning model which is optimized for food detection.
+//
+// The BLIP model is excellent for:
+// - Food and ingredient recognition
+// - Detailed scene descriptions
+// - High accuracy on kitchen/cooking images
+//
+// Parameters:
+//   - apiKey: Hugging Face API authentication key
+//
+// Returns a configured HuggingFaceService ready for use.
 func NewHuggingFaceService(apiKey string) *HuggingFaceService {
 	return &HuggingFaceService{
 		apiKey: apiKey,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
-		// Using Salesforce BLIP image captioning - great for food detection
 		modelURL: "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large",
 	}
 }
 
-// HuggingFaceResponse represents the API response structure
+// HuggingFaceResponse represents the structure of the API response from Hugging Face.
+// The model returns generated text describing the image content.
 type HuggingFaceResponse struct {
-	GeneratedText string `json:"generated_text"`
+	GeneratedText string `json:"generated_text"` // AI-generated caption describing the image
 }
 
-// DetectIngredients sends image to Hugging Face and extracts ingredients
+// DetectIngredients analyzes an image using Hugging Face's BLIP model
+// and extracts ingredient names from the generated caption.
+//
+// Process:
+// 1. Send image to Hugging Face API
+// 2. Receive AI-generated caption
+// 3. Parse caption to extract ingredient names
+// 4. Calculate confidence score
+// 5. Return structured result
+//
+// Parameters:
+//   - ctx: Context for request cancellation and timeout
+//   - imageData: Raw image bytes (JPEG, PNG, etc.)
+//   - filename: Original filename for logging/metadata
+//
+// Returns DetectionResult with ingredients or error on failure.
 func (s *HuggingFaceService) DetectIngredients(ctx context.Context, imageData []byte, filename string) (*DetectionResult, error) {
-	// Create request
 	req, err := http.NewRequestWithContext(ctx, "POST", s.modelURL, bytes.NewReader(imageData))
 	if err != nil {
 		return nil, &DetectionError{Provider: "huggingface", Err: err}
 	}
 
-	// Set headers
 	req.Header.Set("Authorization", "Bearer "+s.apiKey)
 	req.Header.Set("Content-Type", "application/octet-stream")
 
-	// Make request
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return nil, &DetectionError{Provider: "huggingface", Err: fmt.Errorf("API request failed: %w", err)}
 	}
 	defer resp.Body.Close()
 
-	// Read response
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, &DetectionError{Provider: "huggingface", Err: fmt.Errorf("failed to read response: %w", err)}
 	}
 
-	// Check for errors
 	if resp.StatusCode != http.StatusOK {
 		return nil, &DetectionError{
 			Provider: "huggingface",
@@ -69,10 +90,8 @@ func (s *HuggingFaceService) DetectIngredients(ctx context.Context, imageData []
 		}
 	}
 
-	// Parse response - can be array or object depending on model state
 	var responses []HuggingFaceResponse
 	if err := json.Unmarshal(body, &responses); err != nil {
-		// Try parsing as single object (when model is loading)
 		var errorResp map[string]interface{}
 		if jsonErr := json.Unmarshal(body, &errorResp); jsonErr == nil {
 			if errMsg, ok := errorResp["error"].(string); ok {
@@ -86,11 +105,9 @@ func (s *HuggingFaceService) DetectIngredients(ctx context.Context, imageData []
 		return nil, &DetectionError{Provider: "huggingface", Err: fmt.Errorf("empty response from API")}
 	}
 
-	// Extract ingredients from generated text
 	generatedText := responses[0].GeneratedText
 	ingredients := ParseIngredientsFromText(generatedText)
 
-	// Build result
 	result := &DetectionResult{
 		Ingredients: ingredients,
 		RawResponse: generatedText,
@@ -108,7 +125,13 @@ func (s *HuggingFaceService) DetectIngredients(ctx context.Context, imageData []
 	return result, nil
 }
 
-// calculateConfidence estimates confidence based on caption quality and ingredient count
+// calculateConfidence estimates the detection confidence based on multiple factors.
+// Higher confidence is assigned when:
+// - More ingredients are detected
+// - Caption contains food-related keywords
+// - Caption is descriptive and detailed
+//
+// Returns a confidence score between 0.0 and 0.95 (never 100% certain).
 func calculateConfidence(caption string, ingredients []string) float64 {
 	if len(ingredients) == 0 {
 		return 0.0
@@ -125,7 +148,6 @@ func calculateConfidence(caption string, ingredients []string) float64 {
 		confidence += 0.1
 	}
 
-	// Check if caption contains food-related words
 	foodWords := []string{"food", "dish", "plate", "bowl", "ingredients", "cooking", "meal"}
 	for _, word := range foodWords {
 		if contains(caption, word) {
@@ -134,7 +156,6 @@ func calculateConfidence(caption string, ingredients []string) float64 {
 		}
 	}
 
-	// Cap at 0.95 (never 100% certain)
 	if confidence > 0.95 {
 		confidence = 0.95
 	}
@@ -142,19 +163,14 @@ func calculateConfidence(caption string, ingredients []string) float64 {
 	return confidence
 }
 
-// contains checks if a string contains a substring (case-insensitive)
+// contains performs a case-insensitive substring search.
 func contains(s, substr string) bool {
 	s = toLower(s)
 	substr = toLower(substr)
 	return bytes.Contains([]byte(s), []byte(substr))
 }
 
-// toLower converts string to lowercase
+// toLower converts a string to lowercase using byte operations.
 func toLower(s string) string {
 	return string(bytes.ToLower([]byte(s)))
-}
-
-// Helper method to encode image to base64 (for alternative API endpoints if needed)
-func encodeBase64(data []byte) string {
-	return base64.StdEncoding.EncodeToString(data)
 }

@@ -1,3 +1,4 @@
+// Package vision provides AI-powered image analysis for ingredient detection.
 package vision
 
 import (
@@ -5,7 +6,10 @@ import (
 	"strings"
 )
 
-// Common ingredients database for matching and normalization
+// commonIngredients is a comprehensive database mapping ingredient variations to canonical names.
+// Used for ingredient detection, normalization, and synonym resolution.
+// Key: ingredient variant (singular/plural/alternative name)
+// Value: normalized canonical name
 var commonIngredients = map[string]string{
 	// Vegetables
 	"tomato": "tomato", "tomatoes": "tomato",
@@ -143,28 +147,37 @@ var commonIngredients = map[string]string{
 	"soup":  "soup",
 }
 
-// ParseIngredientsFromText extracts ingredient names from generated caption text
+// ParseIngredientsFromText extracts and normalizes ingredient names from AI-generated text.
+//
+// Algorithm:
+// 1. Convert text to lowercase for consistent matching
+// 2. Remove noise words (adjectives, measurements, etc.)
+// 3. Split into individual words
+// 4. Match single-word, two-word, and three-word ingredient phrases
+// 5. Normalize to canonical form and deduplicate
+//
+// Handles:
+// - Plurals (tomatoes → tomato)
+// - Multi-word ingredients (olive oil, bell pepper)
+// - Common variations (cilantro/coriander)
+//
+// Parameters:
+//   - text: AI-generated caption or description
+//
+// Returns a slice of normalized, deduplicated ingredient names.
 func ParseIngredientsFromText(text string) []string {
 	if text == "" {
 		return []string{}
 	}
 
-	// Convert to lowercase for matching
 	lowerText := strings.ToLower(text)
-
-	// Remove common non-ingredient words
 	lowerText = removeNoise(lowerText)
 
-	// Extract ingredients
 	detected := make(map[string]bool)
 	ingredients := []string{}
-
-	// Split by common delimiters
 	words := splitWords(lowerText)
 
-	// Check each word and multi-word combinations
 	for i := 0; i < len(words); i++ {
-		// Check single word
 		if normalized, found := commonIngredients[words[i]]; found {
 			if !detected[normalized] {
 				detected[normalized] = true
@@ -172,7 +185,6 @@ func ParseIngredientsFromText(text string) []string {
 			}
 		}
 
-		// Check two-word combinations
 		if i < len(words)-1 {
 			twoWord := words[i] + " " + words[i+1]
 			if normalized, found := commonIngredients[twoWord]; found {
@@ -183,7 +195,6 @@ func ParseIngredientsFromText(text string) []string {
 			}
 		}
 
-		// Check three-word combinations
 		if i < len(words)-2 {
 			threeWord := words[i] + " " + words[i+1] + " " + words[i+2]
 			if normalized, found := commonIngredients[threeWord]; found {
@@ -198,7 +209,15 @@ func ParseIngredientsFromText(text string) []string {
 	return ingredients
 }
 
-// removeNoise removes common non-ingredient descriptive words
+// removeNoise filters out common descriptive words that aren't ingredient names.
+// Removes:
+// - Articles (a, an, the)
+// - Prepositions (with, in, on)
+// - Preparation methods (chopped, sliced, grilled)
+// - Size descriptors (large, small)
+// - Measurements (cup, tablespoon, pound)
+//
+// Returns cleaned text with only potential ingredient words.
 func removeNoise(text string) string {
 	noise := []string{
 		"a ", "an ", "the ", "with ", "and ", "or ", "of ", "in ", "on ",
@@ -217,19 +236,30 @@ func removeNoise(text string) string {
 	return result
 }
 
-// splitWords splits text into words, removing punctuation
+// splitWords tokenizes text into individual words, removing punctuation.
+// Keeps only letters, numbers, and spaces for clean word extraction.
+//
+// Returns a slice of cleaned words ready for ingredient matching.
 func splitWords(text string) []string {
-	// Remove punctuation except spaces
 	reg := regexp.MustCompile(`[^a-z0-9\s]`)
 	cleaned := reg.ReplaceAllString(text, " ")
-
-	// Split by whitespace and filter empty strings
 	words := strings.Fields(cleaned)
 
 	return words
 }
 
-// NormalizeIngredientName converts various forms to canonical form
+// NormalizeIngredientName converts ingredient variations to their canonical form.
+// Handles plurals, synonyms, and alternative spellings.
+//
+// Examples:
+//   - "tomatoes" → "tomato"
+//   - "coriander" → "cilantro"
+//   - "prawns" → "shrimp"
+//
+// Parameters:
+//   - name: ingredient name in any form
+//
+// Returns the normalized canonical name, or lowercase trimmed input if not found.
 func NormalizeIngredientName(name string) string {
 	lower := strings.ToLower(strings.TrimSpace(name))
 	if normalized, found := commonIngredients[lower]; found {
@@ -238,7 +268,13 @@ func NormalizeIngredientName(name string) string {
 	return lower
 }
 
-// IsLikelyFood checks if a word is likely to be a food item
+// IsLikelyFood determines if a word represents a recognized food ingredient.
+// Used for validation and filtering of user input or detected items.
+//
+// Parameters:
+//   - word: potential ingredient name
+//
+// Returns true if the word is in the ingredient database.
 func IsLikelyFood(word string) bool {
 	normalized := strings.ToLower(strings.TrimSpace(word))
 	_, found := commonIngredients[normalized]
