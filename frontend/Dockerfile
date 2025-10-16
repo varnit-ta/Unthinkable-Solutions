@@ -2,8 +2,11 @@
 FROM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json tsconfig*.json ./
+COPY vite.config.ts ./
+COPY index.html ./
+COPY public ./public
 COPY src ./src
-RUN npm ci --silent
+RUN npm install --silent
 RUN npm run build
 
 # final stage - serve with a small Node static server

@@ -23,21 +23,28 @@ type RegisterRequest struct {
 func (a *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
 	// create user via service
 	user, err := a.Service.CreateUser(r.Context(), req.Username, req.Email, req.Password)
 	if err != nil {
-		http.Error(w, "could not create user", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "could not create user"})
 		return
 	}
 	token, err := auth.GenerateJWT(a.JWTSecret, int(user.ID), a.JWTExpiry)
 	if err != nil {
-		http.Error(w, "could not generate token", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "could not generate token"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
 }
 
@@ -49,19 +56,26 @@ type LoginRequest struct {
 func (a *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req LoginRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
 	user, err := a.Service.Authenticate(r.Context(), req.Email, req.Password)
 	if err != nil {
-		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "invalid credentials"})
 		return
 	}
 	token, err := auth.GenerateJWT(a.JWTSecret, int(user.ID), a.JWTExpiry)
 	if err != nil {
-		http.Error(w, "could not generate token", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "could not generate token"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]string{"token": token})
 }

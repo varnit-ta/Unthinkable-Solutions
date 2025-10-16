@@ -45,10 +45,13 @@ func (h *Handler) ListRecipes(w http.ResponseWriter, r *http.Request) {
 	}
 	recipes, err := h.Service.SearchAndFilterRecipes(r.Context(), q, diet, difficulty, maxTimePtr, cuisine, limit, offset)
 	if err != nil {
-		http.Error(w, "db error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "database error"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(recipes)
 }
 
@@ -57,10 +60,13 @@ func (h *Handler) GetRecipe(w http.ResponseWriter, r *http.Request) {
 	id, _ := strconv.Atoi(idStr)
 	recipe, err := h.Service.GetRecipe(r.Context(), id)
 	if err != nil {
-		http.Error(w, "not found", 404)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "recipe not found"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(recipe)
 }
 
@@ -71,7 +77,9 @@ type MatchRequest struct {
 func (h *Handler) Match(w http.ResponseWriter, r *http.Request) {
 	var req MatchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
 	// optional filters via query
@@ -101,10 +109,13 @@ func (h *Handler) Match(w http.ResponseWriter, r *http.Request) {
 		Diet: diet, Difficulty: difficulty, MaxTimeMinutes: maxTimePtr, Cuisine: cuisine, Limit: limit, Offset: offset,
 	})
 	if err != nil {
-		http.Error(w, "server error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(recipes)
 }
 
@@ -116,7 +127,9 @@ type RatingRequest struct {
 func (h *Handler) PostRating(w http.ResponseWriter, r *http.Request) {
 	var req RatingRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
 	// extract user id from context populated by JWTAuth
@@ -128,10 +141,13 @@ func (h *Handler) PostRating(w http.ResponseWriter, r *http.Request) {
 	}
 	rt, err := h.Service.AddRating(r.Context(), uid32, req.RecipeID, req.Rating)
 	if err != nil {
-		http.Error(w, "server error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(rt)
 }
 
@@ -140,21 +156,28 @@ func (h *Handler) AddFavorite(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	recipeID, err := strconv.Atoi(idStr)
 	if err != nil || recipeID <= 0 {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
 	v := r.Context().Value(middleware.UserIDKey)
 	id, ok := v.(int)
 	if !ok || id <= 0 {
-		http.Error(w, "unauthorized", 401)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "unauthorized"})
 		return
 	}
 	fav, err := h.Service.AddFavorite(r.Context(), id, recipeID)
 	if err != nil {
-		http.Error(w, "server error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(fav)
 }
 
@@ -162,35 +185,46 @@ func (h *Handler) RemoveFavorite(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	recipeID, err := strconv.Atoi(idStr)
 	if err != nil || recipeID <= 0 {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
 	v := r.Context().Value(middleware.UserIDKey)
 	id, ok := v.(int)
 	if !ok || id <= 0 {
-		http.Error(w, "unauthorized", 401)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "unauthorized"})
 		return
 	}
 	if err := h.Service.RemoveFavorite(r.Context(), id, recipeID); err != nil {
-		http.Error(w, "server error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
-	w.WriteHeader(204)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) ListFavorites(w http.ResponseWriter, r *http.Request) {
 	v := r.Context().Value(middleware.UserIDKey)
 	id, ok := v.(int)
 	if !ok || id <= 0 {
-		http.Error(w, "unauthorized", 401)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "unauthorized"})
 		return
 	}
 	list, err := h.Service.ListFavorites(r.Context(), id)
 	if err != nil {
-		http.Error(w, "server error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(list)
 }
 
@@ -231,7 +265,9 @@ func (h *Handler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 	v := r.Context().Value(middleware.UserIDKey)
 	id, ok := v.(int)
 	if !ok || id <= 0 {
-		http.Error(w, "unauthorized", 401)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "unauthorized"})
 		return
 	}
 	limit := 10
@@ -242,9 +278,12 @@ func (h *Handler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 	}
 	list, err := h.Service.GetSuggestions(r.Context(), id, limit)
 	if err != nil {
-		http.Error(w, "server error", 500)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(list)
 }

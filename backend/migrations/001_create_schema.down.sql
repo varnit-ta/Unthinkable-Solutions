@@ -1,0 +1,4 @@
+-- Rollback schema creation
+DROP TABLE IF EXISTS ratings CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS recipes CASCADE;
