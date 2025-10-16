@@ -23,6 +23,7 @@ type Config struct {
 	DBRetryBackoff    time.Duration // Initial retry backoff duration (DB_RETRY_BACKOFF, default: 500ms)
 	HuggingFaceAPIKey string        // Hugging Face API key for vision AI (HUGGINGFACE_API_KEY)
 	MaxImageSizeMB    int           // Maximum image upload size in MB (MAX_IMAGE_SIZE_MB, default: 10)
+	AllowedOrigins    string        // Comma-separated list of allowed CORS origins (ALLOWED_ORIGINS)
 }
 
 // Load reads configuration from environment variables and returns a Config struct
@@ -52,6 +53,11 @@ func Load() Config {
 	hfAPIKey := os.Getenv("HUGGINGFACE_API_KEY")
 	maxImageSize := parseIntEnv("MAX_IMAGE_SIZE_MB", 10)
 
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		allowedOrigins = "http://localhost:5173,http://localhost:3000,http://localhost:4173,https://unthinkable-solutions-three.vercel.app/"
+	}
+
 	return Config{
 		DatabaseURL:       db,
 		Port:              port,
@@ -65,6 +71,7 @@ func Load() Config {
 		DBRetryBackoff:    retryBackoff,
 		HuggingFaceAPIKey: hfAPIKey,
 		MaxImageSizeMB:    maxImageSize,
+		AllowedOrigins:    allowedOrigins,
 	}
 }
 

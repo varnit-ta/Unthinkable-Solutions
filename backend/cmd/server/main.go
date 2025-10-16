@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -126,8 +127,14 @@ func setupVisionService(cfg config.Config) vision.VisionService {
 func setupRouter(cfg config.Config, h *handlers.Handler, authH *handlers.AuthHandler) *chi.Mux {
 	r := chi.NewRouter()
 
+	// Parse allowed origins from config (comma-separated string)
+	allowedOrigins := strings.Split(cfg.AllowedOrigins, ",")
+	for i := range allowedOrigins {
+		allowedOrigins[i] = strings.TrimSpace(allowedOrigins[i])
+	}
+
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000", "http://localhost:4173"},
+		AllowedOrigins:   allowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},

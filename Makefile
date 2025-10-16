@@ -1,5 +1,10 @@
 SHELL := /bin/sh
 
+ifneq (,$(wildcard .env))
+    include .env
+    export
+endif
+
 .PHONY: help frontend backend sqlc migrate-up migrate-down migrateup migratedown migrateall resetdb docker-build docker-up docker-restart
 
 help:
@@ -11,13 +16,11 @@ help:
 	@echo "  make migrate-down    # Rollback DB migrations using Go migrate runner"
 	@echo "  make migrateup       # Apply migrations using migrate CLI"
 	@echo "  make migratedown     # Rollback migrations using migrate CLI"
-	@echo "  make migrateall      # Apply all migrations in docker container"
-	@echo "  make resetdb         # Reset database and reapply all migrations"
+	@echo "  make migrateall      # Apply all migrations to DATABASE_URL"
+	@echo "  make resetdb         # Reset database and reapply all migrations to DATABASE_URL"
 	@echo "  make docker-build    # Build docker images (frontend/backend)"
 	@echo "  make docker-up       # docker compose up -d"
 	@echo "  make docker-restart  # docker compose restart"
-
-DATABASE_URL ?= postgres://unthinkable:unthinkable@localhost:5432/unthinkable_recipes?sslmode=disable
 
 frontend:
 	@echo "Starting frontend dev server..."
@@ -65,24 +68,12 @@ migratedown:
 
 migrateall:
 	@echo "Running all database migrations..."
-	@type backend\migrations\001_create_schema.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\002_seed_recipes.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\003_users_and_favorites.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\004_add_updated_at_recipes.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\005_add_recipe_fields.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
+	@migrate -path backend/migrations -database "$(DATABASE_URL)" up
 	@echo "All migrations completed successfully!"
 
 resetdb:
 	@echo "Resetting database and running all migrations..."
-	@type backend\migrations\005_add_recipe_fields.down.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\004_add_updated_at_recipes.down.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\003_users_and_favorites.down.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\002_seed_recipes.down.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\001_create_schema.down.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
+	@migrate -path backend/migrations -database "$(DATABASE_URL)" down -all
 	@echo "Running all migrations from scratch..."
-	@type backend\migrations\001_create_schema.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\002_seed_recipes.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\003_users_and_favorites.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\004_add_updated_at_recipes.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
-	@type backend\migrations\005_add_recipe_fields.up.sql | docker exec -i unthinkablesolutions-db-1 psql -U unthinkable -d unthinkable_recipes
+	@migrate -path backend/migrations -database "$(DATABASE_URL)" up
 	@echo "Database reset and migrations completed successfully!"
