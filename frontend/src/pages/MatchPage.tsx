@@ -16,6 +16,8 @@ export default function MatchPage() {
   const [loading, setLoading] = useState(false)
   const [matchedRecipes, setMatchedRecipes] = useState<any[]>([])
   const [loadingRecipes, setLoadingRecipes] = useState(false)
+  const [confidence, setConfidence] = useState<number | null>(null)
+  const [caption, setCaption] = useState<string | null>(null)
   
   // Filters
   const [diet, setDiet] = useState('')
@@ -43,6 +45,8 @@ export default function MatchPage() {
     setPreview(null)
     setDetected([])
     setMatchedRecipes([])
+    setConfidence(null)
+    setCaption(null)
   }
 
   const detectIngredients = async () => {
@@ -51,10 +55,23 @@ export default function MatchPage() {
     try {
       const res = await api.detectIngredients(file)
       setDetected(res.detectedIngredients || [])
-      toast.success(`Detected ${res.detectedIngredients?.length || 0} ingredients!`)
-    } catch (e) {
-      toast.error('Failed to detect ingredients')
+      setConfidence(res.confidence || null)
+      setCaption(res.caption || null)
+      
+      if (res.detectedIngredients?.length > 0) {
+        const confidencePercent = res.confidence ? Math.round(res.confidence * 100) : 0
+        toast.success(`Detected ${res.detectedIngredients.length} ingredients! (${confidencePercent}% confidence)`)
+      } else if (res.message) {
+        toast.warning(res.message)
+      } else {
+        toast.info('No ingredients detected. Try another image or add manually.')
+      }
+    } catch (e: any) {
+      const errorMsg = e?.message || 'Failed to detect ingredients'
+      toast.error(errorMsg)
       setDetected([])
+      setConfidence(null)
+      setCaption(null)
     } finally {
       setLoading(false)
     }
@@ -169,6 +186,25 @@ export default function MatchPage() {
             <CardContent className="space-y-4">
               {detected.length > 0 ? (
                 <>
+                  {/* Show AI detection metadata */}
+                  {(confidence !== null || caption) && (
+                    <div className="mb-4 p-3 bg-muted rounded-lg space-y-2">
+                      {confidence !== null && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">AI Confidence:</span>
+                          <Badge variant={confidence > 0.8 ? "default" : confidence > 0.6 ? "secondary" : "outline"}>
+                            {Math.round(confidence * 100)}%
+                          </Badge>
+                        </div>
+                      )}
+                      {caption && (
+                        <div className="text-xs text-muted-foreground">
+                          <span className="font-medium">AI Caption:</span> "{caption}"
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex flex-wrap gap-2">
                     {detected.map((ingredient) => (
                       <Badge key={ingredient} variant="secondary" className="text-sm py-1 px-3">
@@ -297,9 +333,9 @@ export default function MatchPage() {
                   <CardHeader>
                     <div className="flex items-start justify-between mb-2">
                       <CardTitle className="text-lg line-clamp-2">{recipe.title}</CardTitle>
-                      {recipe.matchCount && (
+                      {(recipe.score || recipe.matchCount) && (
                         <Badge variant="secondary" className="ml-2">
-                          {recipe.matchCount} matches
+                          {recipe.score || recipe.matchCount} matches
                         </Badge>
                       )}
                     </div>
@@ -311,11 +347,13 @@ export default function MatchPage() {
                     <div className="flex flex-wrap gap-2">
                       {recipe.cuisine && <Badge variant="outline">{recipe.cuisine}</Badge>}
                       {recipe.difficulty && <Badge variant="outline">{recipe.difficulty}</Badge>}
+                      {recipe.dietType && <Badge variant="outline">{recipe.dietType}</Badge>}
+                      {recipe.diet_type && <Badge variant="outline">{recipe.diet_type}</Badge>}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
                       <div className="flex items-center gap-1">
                         <Clock className="h-4 w-4" />
-                        <span>{recipe.totalTime || recipe.cookTime || 30} min</span>
+                        <span>{recipe.total_time_minutes || recipe.totalTime || recipe.cook_time_minutes || recipe.cookTime || 30} min</span>
                       </div>
                       {recipe.servings && (
                         <div className="flex items-center gap-1">

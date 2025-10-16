@@ -43,13 +43,20 @@ export const api = {
     const form = new FormData()
     form.append('image', file)
     // uses request which will not set JSON content-type for FormData
-    return request<{ detectedIngredients: string[] }>(`/detect-ingredients`, { method: 'POST', body: form })
+    return request<{ 
+      detectedIngredients: string[]
+      confidence?: number
+      provider?: string
+      caption?: string
+      message?: string
+    }>(`/detect-ingredients`, { method: 'POST', body: form })
   },
   rate: (token: string, recipeId: number, rating: number) =>
     request(`/ratings`, { method: 'POST', body: JSON.stringify({ recipeId, rating }) }, token),
   addFavorite: (token: string, recipeId: number) => request(`/favorites/${recipeId}`, { method: 'POST' }, token),
   removeFavorite: (token: string, recipeId: number) => request(`/favorites/${recipeId}`, { method: 'DELETE' }, token),
   listFavorites: (token: string) => request(`/favorites`, {}, token),
+  isFavorite: (token: string, recipeId: number) => request<{ isFavorite: boolean }>(`/favorites/${recipeId}`, {}, token),
   suggestions: (token: string) => request(`/suggestions`, {}, token),
 }
 

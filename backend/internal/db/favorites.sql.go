@@ -17,8 +17,8 @@ RETURNING id, user_id, recipe_id, created_at
 `
 
 type AddFavoriteParams struct {
-	UserID   sql.NullInt32
-	RecipeID sql.NullInt32
+	UserID   sql.NullInt32 `json:"user_id"`
+	RecipeID sql.NullInt32 `json:"recipe_id"`
 }
 
 func (q *Queries) AddFavorite(ctx context.Context, arg AddFavoriteParams) (Favorite, error) {
@@ -33,8 +33,30 @@ func (q *Queries) AddFavorite(ctx context.Context, arg AddFavoriteParams) (Favor
 	return i, err
 }
 
+const isFavorite = `-- name: IsFavorite :one
+SELECT EXISTS(
+  SELECT 1 FROM favorites
+  WHERE user_id = $1 AND recipe_id = $2
+) as is_favorite
+`
+
+type IsFavoriteParams struct {
+	UserID   sql.NullInt32 `json:"user_id"`
+	RecipeID sql.NullInt32 `json:"recipe_id"`
+}
+
+func (q *Queries) IsFavorite(ctx context.Context, arg IsFavoriteParams) (bool, error) {
+	row := q.db.QueryRowContext(ctx, isFavorite, arg.UserID, arg.RecipeID)
+	var is_favorite bool
+	err := row.Scan(&is_favorite)
+	return is_favorite, err
+}
+
 const listFavoritesByUser = `-- name: ListFavoritesByUser :many
-SELECT f.id, f.user_id, f.recipe_id, f.created_at, r.title, r.cuisine
+SELECT f.id as favorite_id, f.user_id, f.recipe_id, f.created_at, 
+  r.title, r.description, r.cuisine, r.difficulty, r.diet_type, 
+  r.prep_time_minutes, r.cook_time_minutes, r.total_time_minutes, r.servings,
+  (SELECT ROUND(AVG(rating)::numeric, 1) FROM ratings WHERE recipe_id = r.id) as average_rating
 FROM favorites f
 JOIN recipes r ON r.id = f.recipe_id
 WHERE f.user_id = $1
@@ -42,12 +64,20 @@ ORDER BY f.created_at DESC
 `
 
 type ListFavoritesByUserRow struct {
-	ID        int32
-	UserID    sql.NullInt32
-	RecipeID  sql.NullInt32
-	CreatedAt sql.NullTime
-	Title     string
-	Cuisine   sql.NullString
+	FavoriteID       int32          `json:"favorite_id"`
+	UserID           sql.NullInt32  `json:"user_id"`
+	RecipeID         sql.NullInt32  `json:"recipe_id"`
+	CreatedAt        sql.NullTime   `json:"created_at"`
+	Title            string         `json:"title"`
+	Description      sql.NullString `json:"description"`
+	Cuisine          sql.NullString `json:"cuisine"`
+	Difficulty       sql.NullString `json:"difficulty"`
+	DietType         sql.NullString `json:"diet_type"`
+	PrepTimeMinutes  sql.NullInt32  `json:"prep_time_minutes"`
+	CookTimeMinutes  sql.NullInt32  `json:"cook_time_minutes"`
+	TotalTimeMinutes sql.NullInt32  `json:"total_time_minutes"`
+	Servings         sql.NullInt32  `json:"servings"`
+	AverageRating    string         `json:"average_rating"`
 }
 
 func (q *Queries) ListFavoritesByUser(ctx context.Context, userID sql.NullInt32) ([]ListFavoritesByUserRow, error) {
@@ -60,12 +90,20 @@ func (q *Queries) ListFavoritesByUser(ctx context.Context, userID sql.NullInt32)
 	for rows.Next() {
 		var i ListFavoritesByUserRow
 		if err := rows.Scan(
-			&i.ID,
+			&i.FavoriteID,
 			&i.UserID,
 			&i.RecipeID,
 			&i.CreatedAt,
 			&i.Title,
+			&i.Description,
 			&i.Cuisine,
+			&i.Difficulty,
+			&i.DietType,
+			&i.PrepTimeMinutes,
+			&i.CookTimeMinutes,
+			&i.TotalTimeMinutes,
+			&i.Servings,
+			&i.AverageRating,
 		); err != nil {
 			return nil, err
 		}
@@ -85,8 +123,8 @@ DELETE FROM favorites WHERE user_id = $1 AND recipe_id = $2
 `
 
 type RemoveFavoriteParams struct {
-	UserID   sql.NullInt32
-	RecipeID sql.NullInt32
+	UserID   sql.NullInt32 `json:"user_id"`
+	RecipeID sql.NullInt32 `json:"recipe_id"`
 }
 
 func (q *Queries) RemoveFavorite(ctx context.Context, arg RemoveFavoriteParams) error {

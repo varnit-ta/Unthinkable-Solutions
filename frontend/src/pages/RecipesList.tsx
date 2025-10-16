@@ -1,15 +1,19 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
+import { useAuth } from '../auth'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card'
 import { Input } from '../components/ui/input'
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select'
 import { Skeleton } from '../components/ui/skeleton'
-import { Search, Clock, Users, ChefHat } from 'lucide-react'
+import { Search, Clock, Users, ChefHat, Heart } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function RecipesList() {
+  const { token } = useAuth()
+  const navigate = useNavigate()
   const [recipes, setRecipes] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -17,6 +21,7 @@ export default function RecipesList() {
   const [difficulty, setDifficulty] = useState('')
   const [cuisine, setCuisine] = useState('')
   const [maxTime, setMaxTime] = useState('')
+  const [favorites, setFavorites] = useState<Set<number>>(new Set())
 
   const fetchRecipes = async () => {
     setLoading(true)
@@ -30,6 +35,23 @@ export default function RecipesList() {
     try {
       const data = await api.listRecipes(params)
       setRecipes(data)
+      
+      // Fetch favorite status for all recipes if user is logged in
+      if (token && data.length > 0) {
+        const favoriteChecks = await Promise.allSettled(
+          data.map((recipe: any) => 
+            api.isFavorite(token, recipe.id).then(res => ({ id: recipe.id, isFavorite: res.isFavorite }))
+          )
+        )
+        
+        const newFavorites = new Set<number>()
+        favoriteChecks.forEach((result) => {
+          if (result.status === 'fulfilled' && result.value.isFavorite) {
+            newFavorites.add(result.value.id)
+          }
+        })
+        setFavorites(newFavorites)
+      }
     } catch (error) {
       setRecipes([])
     } finally {
@@ -39,7 +61,7 @@ export default function RecipesList() {
 
   useEffect(() => {
     fetchRecipes()
-  }, [])
+  }, [token])
 
   const handleSearch = () => {
     fetchRecipes()
@@ -53,6 +75,36 @@ export default function RecipesList() {
     setMaxTime('')
     const params = new URLSearchParams({ limit: '50' })
     api.listRecipes(params).then(setRecipes).catch(() => setRecipes([]))
+  }
+
+  const handleFavoriteToggle = async (recipeId: number, e: React.MouseEvent) => {
+    e.preventDefault() // Prevent navigation to recipe detail
+    
+    if (!token) {
+      toast.error('Please login to add favorites')
+      navigate('/login')
+      return
+    }
+
+    const isFavorite = favorites.has(recipeId)
+    
+    try {
+      if (isFavorite) {
+        await api.removeFavorite(token, recipeId)
+        setFavorites(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(recipeId)
+          return newSet
+        })
+        toast.success('Removed from favorites')
+      } else {
+        await api.addFavorite(token, recipeId)
+        setFavorites(prev => new Set(prev).add(recipeId))
+        toast.success('Added to favorites')
+      }
+    } catch (error) {
+      toast.error('Failed to update favorite')
+    }
   }
 
   return (
@@ -179,41 +231,67 @@ export default function RecipesList() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {recipes.map((recipe: any) => (
-              <Card key={recipe.id} className="hover:shadow-lg transition-shadow">
+              <Card key={recipe.id} className="hover:shadow-lg transition-all hover:-translate-y-1 duration-200 relative">
                 <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <CardTitle className="text-lg line-clamp-2">{recipe.title}</CardTitle>
-                    {recipe.averageRating && (
-                      <Badge variant="secondary" className="ml-2">
-                        ⭐ {recipe.averageRating.toFixed(1)}
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <CardTitle className="text-lg line-clamp-2 flex-1">{recipe.title}</CardTitle>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {recipe.average_rating && parseFloat(recipe.average_rating) > 0 && (
+                        <Badge variant="secondary">
+                          ⭐ {parseFloat(recipe.average_rating).toFixed(1)}
+                        </Badge>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => handleFavoriteToggle(recipe.id, e)}
+                      >
+                        <Heart
+                          className={`h-5 w-5 ${
+                            favorites.has(recipe.id)
+                              ? 'fill-red-500 text-red-500'
+                              : 'text-muted-foreground'
+                          }`}
+                        />
+                      </Button>
+                    </div>
+                  </div>
+                  {recipe.description && (
+                    <CardDescription className="line-clamp-2">
+                      {recipe.description}
+                    </CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    {recipe.cuisine && (
+                      <Badge variant="outline">
+                        🍽️ {recipe.cuisine}
+                      </Badge>
+                    )}
+                    {recipe.difficulty && (
+                      <Badge variant="secondary">
+                        {recipe.difficulty}
+                      </Badge>
+                    )}
+                    {recipe.diet_type && (
+                      <Badge variant="outline">
+                        {recipe.diet_type}
                       </Badge>
                     )}
                   </div>
-                  <CardDescription className="line-clamp-2">
-                    {recipe.description || 'Delicious recipe to try'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    {recipe.cuisine && (
-                      <Badge variant="outline">{recipe.cuisine}</Badge>
-                    )}
-                    {recipe.difficulty && (
-                      <Badge variant="outline">{recipe.difficulty}</Badge>
-                    )}
-                    {recipe.dietType && (
-                      <Badge variant="outline">{recipe.dietType}</Badge>
-                    )}
-                  </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{recipe.totalTime || recipe.cookTime || 30} min</span>
-                    </div>
-                    {recipe.servings && (
+                    {(recipe.total_time_minutes || recipe.cook_time_minutes) && (
+                      <div className="flex items-center gap-1">
+                        <Clock className="h-4 w-4" />
+                        <span>{recipe.total_time_minutes || recipe.cook_time_minutes} min</span>
+                      </div>
+                    )}
+                    {recipe.servings && recipe.servings > 0 && (
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
-                        <span>{recipe.servings} servings</span>
+                        <span>{recipe.servings}</span>
                       </div>
                     )}
                   </div>

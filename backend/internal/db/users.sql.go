@@ -17,16 +17,16 @@ RETURNING id, username, email, created_at
 `
 
 type CreateUserParams struct {
-	Username     sql.NullString
-	Email        sql.NullString
-	PasswordHash sql.NullString
+	Username     sql.NullString `json:"username"`
+	Email        sql.NullString `json:"email"`
+	PasswordHash sql.NullString `json:"password_hash"`
 }
 
 type CreateUserRow struct {
-	ID        int32
-	Username  sql.NullString
-	Email     sql.NullString
-	CreatedAt sql.NullTime
+	ID        int32          `json:"id"`
+	Username  sql.NullString `json:"username"`
+	Email     sql.NullString `json:"email"`
+	CreatedAt sql.NullTime   `json:"created_at"`
 }
 
 func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateUserRow, error) {
@@ -48,11 +48,11 @@ WHERE email = $1
 `
 
 type GetUserByEmailRow struct {
-	ID           int32
-	Username     sql.NullString
-	Email        sql.NullString
-	PasswordHash sql.NullString
-	CreatedAt    sql.NullTime
+	ID           int32          `json:"id"`
+	Username     sql.NullString `json:"username"`
+	Email        sql.NullString `json:"email"`
+	PasswordHash sql.NullString `json:"password_hash"`
+	CreatedAt    sql.NullTime   `json:"created_at"`
 }
 
 func (q *Queries) GetUserByEmail(ctx context.Context, email sql.NullString) (GetUserByEmailRow, error) {
@@ -75,10 +75,10 @@ WHERE id = $1
 `
 
 type GetUserByIDRow struct {
-	ID        int32
-	Username  sql.NullString
-	Email     sql.NullString
-	CreatedAt sql.NullTime
+	ID        int32          `json:"id"`
+	Username  sql.NullString `json:"username"`
+	Email     sql.NullString `json:"email"`
+	CreatedAt sql.NullTime   `json:"created_at"`
 }
 
 func (q *Queries) GetUserByID(ctx context.Context, id int32) (GetUserByIDRow, error) {

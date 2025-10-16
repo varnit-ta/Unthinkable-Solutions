@@ -14,29 +14,37 @@ import (
 )
 
 const createRecipe = `-- name: CreateRecipe :one
-INSERT INTO recipes (title, cuisine, difficulty, cook_time_minutes, servings, tags, ingredients, steps, nutrition)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+INSERT INTO recipes (title, description, cuisine, difficulty, diet_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, tags, ingredients, steps, nutrition)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 RETURNING id
 `
 
 type CreateRecipeParams struct {
-	Title           string
-	Cuisine         sql.NullString
-	Difficulty      sql.NullString
-	CookTimeMinutes sql.NullInt32
-	Servings        sql.NullInt32
-	Tags            []string
-	Ingredients     pqtype.NullRawMessage
-	Steps           pqtype.NullRawMessage
-	Nutrition       pqtype.NullRawMessage
+	Title            string                `json:"title"`
+	Description      sql.NullString        `json:"description"`
+	Cuisine          sql.NullString        `json:"cuisine"`
+	Difficulty       sql.NullString        `json:"difficulty"`
+	DietType         sql.NullString        `json:"diet_type"`
+	PrepTimeMinutes  sql.NullInt32         `json:"prep_time_minutes"`
+	CookTimeMinutes  sql.NullInt32         `json:"cook_time_minutes"`
+	TotalTimeMinutes sql.NullInt32         `json:"total_time_minutes"`
+	Servings         sql.NullInt32         `json:"servings"`
+	Tags             []string              `json:"tags"`
+	Ingredients      pqtype.NullRawMessage `json:"ingredients"`
+	Steps            pqtype.NullRawMessage `json:"steps"`
+	Nutrition        pqtype.NullRawMessage `json:"nutrition"`
 }
 
 func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (int32, error) {
 	row := q.db.QueryRowContext(ctx, createRecipe,
 		arg.Title,
+		arg.Description,
 		arg.Cuisine,
 		arg.Difficulty,
+		arg.DietType,
+		arg.PrepTimeMinutes,
 		arg.CookTimeMinutes,
+		arg.TotalTimeMinutes,
 		arg.Servings,
 		pq.Array(arg.Tags),
 		arg.Ingredients,
@@ -51,7 +59,7 @@ func (q *Queries) CreateRecipe(ctx context.Context, arg CreateRecipeParams) (int
 const getRatingsForRecipe = `-- name: GetRatingsForRecipe :many
 SELECT id, user_id, recipe_id, rating, created_at
 FROM ratings
-WHERE recipe_id = $1
+WHERE ratings.recipe_id = $1
 `
 
 func (q *Queries) GetRatingsForRecipe(ctx context.Context, recipeID sql.NullInt32) ([]Rating, error) {
@@ -84,22 +92,28 @@ func (q *Queries) GetRatingsForRecipe(ctx context.Context, recipeID sql.NullInt3
 }
 
 const getRecipeByID = `-- name: GetRecipeByID :one
-SELECT id, title, cuisine, difficulty, cook_time_minutes, servings, ingredients, steps, nutrition, tags
+SELECT id, title, description, cuisine, difficulty, diet_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, ingredients, steps, nutrition, tags,
+  COALESCE((SELECT ROUND(AVG(rating)::numeric, 1)::text FROM ratings r WHERE r.recipe_id = recipes.id), '0') as average_rating
 FROM recipes
-WHERE id = $1
+WHERE recipes.id = $1
 `
 
 type GetRecipeByIDRow struct {
-	ID              int32
-	Title           string
-	Cuisine         sql.NullString
-	Difficulty      sql.NullString
-	CookTimeMinutes sql.NullInt32
-	Servings        sql.NullInt32
-	Ingredients     pqtype.NullRawMessage
-	Steps           pqtype.NullRawMessage
-	Nutrition       pqtype.NullRawMessage
-	Tags            []string
+	ID               int32                 `json:"id"`
+	Title            string                `json:"title"`
+	Description      sql.NullString        `json:"description"`
+	Cuisine          sql.NullString        `json:"cuisine"`
+	Difficulty       sql.NullString        `json:"difficulty"`
+	DietType         sql.NullString        `json:"diet_type"`
+	PrepTimeMinutes  sql.NullInt32         `json:"prep_time_minutes"`
+	CookTimeMinutes  sql.NullInt32         `json:"cook_time_minutes"`
+	TotalTimeMinutes sql.NullInt32         `json:"total_time_minutes"`
+	Servings         sql.NullInt32         `json:"servings"`
+	Ingredients      pqtype.NullRawMessage `json:"ingredients"`
+	Steps            pqtype.NullRawMessage `json:"steps"`
+	Nutrition        pqtype.NullRawMessage `json:"nutrition"`
+	Tags             []string              `json:"tags"`
+	AverageRating    interface{}           `json:"average_rating"`
 }
 
 func (q *Queries) GetRecipeByID(ctx context.Context, id int32) (GetRecipeByIDRow, error) {
@@ -108,14 +122,19 @@ func (q *Queries) GetRecipeByID(ctx context.Context, id int32) (GetRecipeByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Title,
+		&i.Description,
 		&i.Cuisine,
 		&i.Difficulty,
+		&i.DietType,
+		&i.PrepTimeMinutes,
 		&i.CookTimeMinutes,
+		&i.TotalTimeMinutes,
 		&i.Servings,
 		&i.Ingredients,
 		&i.Steps,
 		&i.Nutrition,
 		pq.Array(&i.Tags),
+		&i.AverageRating,
 	)
 	return i, err
 }
@@ -127,9 +146,9 @@ RETURNING id, user_id, recipe_id, rating, created_at
 `
 
 type InsertRatingParams struct {
-	UserID   sql.NullInt32
-	RecipeID sql.NullInt32
-	Rating   sql.NullInt32
+	UserID   sql.NullInt32 `json:"user_id"`
+	RecipeID sql.NullInt32 `json:"recipe_id"`
+	Rating   sql.NullInt32 `json:"rating"`
 }
 
 func (q *Queries) InsertRating(ctx context.Context, arg InsertRatingParams) (Rating, error) {
@@ -146,24 +165,30 @@ func (q *Queries) InsertRating(ctx context.Context, arg InsertRatingParams) (Rat
 }
 
 const listRecipes = `-- name: ListRecipes :many
-SELECT id, title, cuisine, difficulty, cook_time_minutes, servings
+SELECT id, title, description, cuisine, difficulty, diet_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings,
+  COALESCE((SELECT ROUND(AVG(rating)::numeric, 1)::text FROM ratings r WHERE r.recipe_id = recipes.id), '0') as average_rating
 FROM recipes
-ORDER BY id
+ORDER BY recipes.id
 LIMIT $1 OFFSET $2
 `
 
 type ListRecipesParams struct {
-	Limit  int32
-	Offset int32
+	Limit  int32 `json:"limit"`
+	Offset int32 `json:"offset"`
 }
 
 type ListRecipesRow struct {
-	ID              int32
-	Title           string
-	Cuisine         sql.NullString
-	Difficulty      sql.NullString
-	CookTimeMinutes sql.NullInt32
-	Servings        sql.NullInt32
+	ID               int32          `json:"id"`
+	Title            string         `json:"title"`
+	Description      sql.NullString `json:"description"`
+	Cuisine          sql.NullString `json:"cuisine"`
+	Difficulty       sql.NullString `json:"difficulty"`
+	DietType         sql.NullString `json:"diet_type"`
+	PrepTimeMinutes  sql.NullInt32  `json:"prep_time_minutes"`
+	CookTimeMinutes  sql.NullInt32  `json:"cook_time_minutes"`
+	TotalTimeMinutes sql.NullInt32  `json:"total_time_minutes"`
+	Servings         sql.NullInt32  `json:"servings"`
+	AverageRating    interface{}    `json:"average_rating"`
 }
 
 // List a page of recipes
@@ -179,10 +204,15 @@ func (q *Queries) ListRecipes(ctx context.Context, arg ListRecipesParams) ([]Lis
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
+			&i.Description,
 			&i.Cuisine,
 			&i.Difficulty,
+			&i.DietType,
+			&i.PrepTimeMinutes,
 			&i.CookTimeMinutes,
+			&i.TotalTimeMinutes,
 			&i.Servings,
+			&i.AverageRating,
 		); err != nil {
 			return nil, err
 		}
@@ -198,30 +228,36 @@ func (q *Queries) ListRecipes(ctx context.Context, arg ListRecipesParams) ([]Lis
 }
 
 const searchRecipes = `-- name: SearchRecipes :many
-SELECT id, title, cuisine, difficulty, cook_time_minutes, servings, ingredients, steps, nutrition, tags
+SELECT id, title, description, cuisine, difficulty, diet_type, prep_time_minutes, cook_time_minutes, total_time_minutes, servings, ingredients, steps, nutrition, tags,
+  COALESCE((SELECT ROUND(AVG(rating)::numeric, 1)::text FROM ratings r WHERE r.recipe_id = recipes.id), '0') as average_rating
 FROM recipes
-WHERE title ILIKE '%' || $1 || '%' OR $1 = ANY(tags)
-ORDER BY id
+WHERE recipes.title ILIKE '%' || $1 || '%' OR $1 = ANY(recipes.tags)
+ORDER BY recipes.id
 LIMIT $2 OFFSET $3
 `
 
 type SearchRecipesParams struct {
-	Column1 sql.NullString
-	Limit   int32
-	Offset  int32
+	Column1 sql.NullString `json:"column_1"`
+	Limit   int32          `json:"limit"`
+	Offset  int32          `json:"offset"`
 }
 
 type SearchRecipesRow struct {
-	ID              int32
-	Title           string
-	Cuisine         sql.NullString
-	Difficulty      sql.NullString
-	CookTimeMinutes sql.NullInt32
-	Servings        sql.NullInt32
-	Ingredients     pqtype.NullRawMessage
-	Steps           pqtype.NullRawMessage
-	Nutrition       pqtype.NullRawMessage
-	Tags            []string
+	ID               int32                 `json:"id"`
+	Title            string                `json:"title"`
+	Description      sql.NullString        `json:"description"`
+	Cuisine          sql.NullString        `json:"cuisine"`
+	Difficulty       sql.NullString        `json:"difficulty"`
+	DietType         sql.NullString        `json:"diet_type"`
+	PrepTimeMinutes  sql.NullInt32         `json:"prep_time_minutes"`
+	CookTimeMinutes  sql.NullInt32         `json:"cook_time_minutes"`
+	TotalTimeMinutes sql.NullInt32         `json:"total_time_minutes"`
+	Servings         sql.NullInt32         `json:"servings"`
+	Ingredients      pqtype.NullRawMessage `json:"ingredients"`
+	Steps            pqtype.NullRawMessage `json:"steps"`
+	Nutrition        pqtype.NullRawMessage `json:"nutrition"`
+	Tags             []string              `json:"tags"`
+	AverageRating    interface{}           `json:"average_rating"`
 }
 
 // Simple search by title or tags
@@ -237,14 +273,19 @@ func (q *Queries) SearchRecipes(ctx context.Context, arg SearchRecipesParams) ([
 		if err := rows.Scan(
 			&i.ID,
 			&i.Title,
+			&i.Description,
 			&i.Cuisine,
 			&i.Difficulty,
+			&i.DietType,
+			&i.PrepTimeMinutes,
 			&i.CookTimeMinutes,
+			&i.TotalTimeMinutes,
 			&i.Servings,
 			&i.Ingredients,
 			&i.Steps,
 			&i.Nutrition,
 			pq.Array(&i.Tags),
+			&i.AverageRating,
 		); err != nil {
 			return nil, err
 		}

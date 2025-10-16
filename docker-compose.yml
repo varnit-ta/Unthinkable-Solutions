@@ -23,6 +23,8 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://unthinkable:unthinkable@db:5432/unthinkable_recipes?sslmode=disable}
       PORT: ${PORT:-8081}
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-secure-secret}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-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}
+      MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-10}
     depends_on:
       - db
     ports:

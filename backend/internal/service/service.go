@@ -150,8 +150,13 @@ type MatchFilters struct {
 	Offset         int
 }
 
+type RecipeWithScore struct {
+	db.SearchRecipesRow
+	Score int `json:"score"`
+}
+
 // MatchWithFilters filters candidates first, then scores them by title/tag overlap against provided ingredients.
-func (s *Service) MatchWithFilters(ctx context.Context, ingredients []string, filters MatchFilters) ([]RecipeSummary, error) {
+func (s *Service) MatchWithFilters(ctx context.Context, ingredients []string, filters MatchFilters) ([]RecipeWithScore, error) {
 	candidates, err := s.SearchAndFilterRecipes(ctx, "", filters.Diet, filters.Difficulty, filters.MaxTimeMinutes, filters.Cuisine, filters.Limit, filters.Offset)
 	if err != nil {
 		return nil, err
@@ -160,7 +165,7 @@ func (s *Service) MatchWithFilters(ctx context.Context, ingredients []string, fi
 	for _, d := range ingredients {
 		detectedSet[strings.ToLower(strings.TrimSpace(d))] = struct{}{}
 	}
-	var results []RecipeSummary
+	var results []RecipeWithScore
 	for _, r := range candidates {
 		score := 0
 		for _, t := range r.Tags {
@@ -174,7 +179,7 @@ func (s *Service) MatchWithFilters(ctx context.Context, ingredients []string, fi
 				score++
 			}
 		}
-		results = append(results, RecipeSummary{ID: r.ID, Title: r.Title, Score: score})
+		results = append(results, RecipeWithScore{SearchRecipesRow: r, Score: score})
 	}
 	sort.Slice(results, func(i, j int) bool { return results[i].Score > results[j].Score })
 	return results, nil
@@ -223,8 +228,15 @@ func (s *Service) ListFavorites(ctx context.Context, userID int) ([]db.ListFavor
 	return s.q.ListFavoritesByUser(ctx, sql.NullInt32{Int32: int32(userID), Valid: true})
 }
 
+func (s *Service) IsFavorite(ctx context.Context, userID int, recipeID int) (bool, error) {
+	return s.q.IsFavorite(ctx, db.IsFavoriteParams{
+		UserID:   sql.NullInt32{Int32: int32(userID), Valid: true},
+		RecipeID: sql.NullInt32{Int32: int32(recipeID), Valid: true},
+	})
+}
+
 // Suggestions: simple content-based filtering using tag overlap with user's favorites and high ratings
-func (s *Service) GetSuggestions(ctx context.Context, userID int, limit int) ([]RecipeSummary, error) {
+func (s *Service) GetSuggestions(ctx context.Context, userID int, limit int) ([]RecipeWithScore, error) {
 	favs, err := s.ListFavorites(ctx, userID)
 	if err != nil {
 		return nil, err
@@ -245,14 +257,14 @@ func (s *Service) GetSuggestions(ctx context.Context, userID int, limit int) ([]
 	if err != nil {
 		return nil, err
 	}
-	var scored []RecipeSummary
+	var scored []RecipeWithScore
 	for _, c := range candidates {
 		score := 0
 		for _, t := range c.Tags {
 			score += favoriteTagCounts[strings.ToLower(t)]
 		}
 		if score > 0 {
-			scored = append(scored, RecipeSummary{ID: c.ID, Title: c.Title, Score: score})
+			scored = append(scored, RecipeWithScore{SearchRecipesRow: c, Score: score})
 		}
 	}
 	sort.Slice(scored, func(i, j int) bool { return scored[i].Score > scored[j].Score })

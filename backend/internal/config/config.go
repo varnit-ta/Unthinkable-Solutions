@@ -7,16 +7,18 @@ import (
 )
 
 type Config struct {
-	DatabaseURL    string
-	Port           string
-	JWTSecret      string
-	JWTExpiryHours int
-	DBMaxOpenConns int
-	DBMaxIdleConns int
-	DBConnMaxIdle  time.Duration
-	DBConnMaxLife  time.Duration
-	DBRetryMax     int
-	DBRetryBackoff time.Duration
+	DatabaseURL       string
+	Port              string
+	JWTSecret         string
+	JWTExpiryHours    int
+	DBMaxOpenConns    int
+	DBMaxIdleConns    int
+	DBConnMaxIdle     time.Duration
+	DBConnMaxLife     time.Duration
+	DBRetryMax        int
+	DBRetryBackoff    time.Duration
+	HuggingFaceAPIKey string
+	MaxImageSizeMB    int
 }
 
 func Load() Config {
@@ -41,17 +43,23 @@ func Load() Config {
 	retryMax := parseIntEnv("DB_RETRY_MAX", 8)
 	retryBackoff := parseDurationEnv("DB_RETRY_BACKOFF", 500*time.Millisecond) // default 500ms
 
+	// Vision API settings
+	hfAPIKey := os.Getenv("HUGGINGFACE_API_KEY")
+	maxImageSize := parseIntEnv("MAX_IMAGE_SIZE_MB", 10) // default 10MB
+
 	return Config{
-		DatabaseURL:    db,
-		Port:           port,
-		JWTSecret:      secret,
-		JWTExpiryHours: expiry,
-		DBMaxOpenConns: maxOpen,
-		DBMaxIdleConns: maxIdle,
-		DBConnMaxIdle:  idle,
-		DBConnMaxLife:  life,
-		DBRetryMax:     retryMax,
-		DBRetryBackoff: retryBackoff,
+		DatabaseURL:       db,
+		Port:              port,
+		JWTSecret:         secret,
+		JWTExpiryHours:    expiry,
+		DBMaxOpenConns:    maxOpen,
+		DBMaxIdleConns:    maxIdle,
+		DBConnMaxIdle:     idle,
+		DBConnMaxLife:     life,
+		DBRetryMax:        retryMax,
+		DBRetryBackoff:    retryBackoff,
+		HuggingFaceAPIKey: hfAPIKey,
+		MaxImageSizeMB:    maxImageSize,
 	}
 }
 

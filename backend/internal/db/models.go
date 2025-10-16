@@ -11,38 +11,43 @@ import (
 )
 
 type Favorite struct {
-	ID        int32
-	UserID    sql.NullInt32
-	RecipeID  sql.NullInt32
-	CreatedAt sql.NullTime
+	ID        int32         `json:"id"`
+	UserID    sql.NullInt32 `json:"user_id"`
+	RecipeID  sql.NullInt32 `json:"recipe_id"`
+	CreatedAt sql.NullTime  `json:"created_at"`
 }
 
 type Rating struct {
-	ID        int32
-	UserID    sql.NullInt32
-	RecipeID  sql.NullInt32
-	Rating    sql.NullInt32
-	CreatedAt sql.NullTime
+	ID        int32         `json:"id"`
+	UserID    sql.NullInt32 `json:"user_id"`
+	RecipeID  sql.NullInt32 `json:"recipe_id"`
+	Rating    sql.NullInt32 `json:"rating"`
+	CreatedAt sql.NullTime  `json:"created_at"`
 }
 
 type Recipe struct {
-	ID              int32
-	Title           string
-	Cuisine         sql.NullString
-	Difficulty      sql.NullString
-	CookTimeMinutes sql.NullInt32
-	Servings        sql.NullInt32
-	Tags            []string
-	Ingredients     pqtype.NullRawMessage
-	Steps           pqtype.NullRawMessage
-	Nutrition       pqtype.NullRawMessage
-	CreatedAt       sql.NullTime
+	ID               int32                 `json:"id"`
+	Title            string                `json:"title"`
+	Cuisine          sql.NullString        `json:"cuisine"`
+	Difficulty       sql.NullString        `json:"difficulty"`
+	CookTimeMinutes  sql.NullInt32         `json:"cook_time_minutes"`
+	Servings         sql.NullInt32         `json:"servings"`
+	Tags             []string              `json:"tags"`
+	Ingredients      pqtype.NullRawMessage `json:"ingredients"`
+	Steps            pqtype.NullRawMessage `json:"steps"`
+	Nutrition        pqtype.NullRawMessage `json:"nutrition"`
+	CreatedAt        sql.NullTime          `json:"created_at"`
+	UpdatedAt        sql.NullTime          `json:"updated_at"`
+	Description      sql.NullString        `json:"description"`
+	DietType         sql.NullString        `json:"diet_type"`
+	PrepTimeMinutes  sql.NullInt32         `json:"prep_time_minutes"`
+	TotalTimeMinutes sql.NullInt32         `json:"total_time_minutes"`
 }
 
 type User struct {
-	ID           int32
-	Username     sql.NullString
-	CreatedAt    sql.NullTime
-	Email        sql.NullString
-	PasswordHash sql.NullString
+	ID           int32          `json:"id"`
+	Username     sql.NullString `json:"username"`
+	CreatedAt    sql.NullTime   `json:"created_at"`
+	Email        sql.NullString `json:"email"`
+	PasswordHash sql.NullString `json:"password_hash"`
 }

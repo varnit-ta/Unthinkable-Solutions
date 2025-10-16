@@ -119,14 +119,14 @@ export default function SuggestionsPage() {
                     {recipe.difficulty && (
                       <Badge variant="outline">{recipe.difficulty}</Badge>
                     )}
-                    {recipe.dietType && (
-                      <Badge variant="outline">{recipe.dietType}</Badge>
+                    {(recipe.dietType || recipe.diet_type) && (
+                      <Badge variant="outline">{recipe.dietType || recipe.diet_type}</Badge>
                     )}
                   </div>
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <Clock className="h-4 w-4" />
-                      <span>{recipe.totalTime || recipe.cookTime || 30} min</span>
+                      <span>{recipe.total_time_minutes || recipe.totalTime || recipe.cook_time_minutes || recipe.cookTime || 30} min</span>
                     </div>
                     {recipe.servings && (
                       <div className="flex items-center gap-1">

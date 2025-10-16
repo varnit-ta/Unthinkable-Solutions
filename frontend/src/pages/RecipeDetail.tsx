@@ -26,7 +26,14 @@ export default function RecipeDetail() {
       .then(setRecipe)
       .catch(() => setRecipe(null))
       .finally(() => setLoading(false))
-  }, [id])
+    
+    // Fetch favorite status if user is logged in
+    if (token) {
+      api.isFavorite(token, Number(id))
+        .then(res => setIsFavorite(res.isFavorite))
+        .catch(() => setIsFavorite(false))
+    }
+  }, [id, token])
 
   const handleFavorite = async () => {
     if (!token) {
@@ -140,28 +147,30 @@ export default function RecipeDetail() {
               </div>
 
               <div className="flex flex-wrap gap-2 mt-4">
-                {recipe.cuisine && <Badge>{recipe.cuisine}</Badge>}
-                {recipe.difficulty && <Badge variant="outline">{recipe.difficulty}</Badge>}
-                {recipe.dietType && <Badge variant="secondary">{recipe.dietType}</Badge>}
+                {recipe.cuisine && <Badge variant="outline">🍽️ {recipe.cuisine}</Badge>}
+                {recipe.difficulty && <Badge variant="secondary">{recipe.difficulty}</Badge>}
+                {recipe.diet_type && <Badge variant="outline">{recipe.diet_type}</Badge>}
               </div>
 
               <div className="flex items-center gap-6 mt-4 text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
-                  <span className="font-medium">
-                    {recipe.totalTime || recipe.cookTime || 30} min
-                  </span>
-                </div>
-                {recipe.servings && (
+                {(recipe.total_time_minutes || recipe.cook_time_minutes) && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    <span className="font-medium">
+                      {recipe.total_time_minutes || recipe.cook_time_minutes} min
+                    </span>
+                  </div>
+                )}
+                {recipe.servings && recipe.servings > 0 && (
                   <div className="flex items-center gap-2">
                     <Users className="h-5 w-5" />
                     <span className="font-medium">{recipe.servings} servings</span>
                   </div>
                 )}
-                {recipe.averageRating && (
+                {recipe.average_rating && parseFloat(recipe.average_rating) > 0 && (
                   <div className="flex items-center gap-2">
                     <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
-                    <span className="font-medium">{recipe.averageRating.toFixed(1)}</span>
+                    <span className="font-medium">{parseFloat(recipe.average_rating).toFixed(1)}</span>
                   </div>
                 )}
               </div>
@@ -175,10 +184,15 @@ export default function RecipeDetail() {
             <CardContent>
               {recipe.ingredients && recipe.ingredients.length > 0 ? (
                 <ul className="space-y-2">
-                  {recipe.ingredients.map((ingredient: string, index: number) => (
+                  {recipe.ingredients.map((ingredient: any, index: number) => (
                     <li key={index} className="flex items-start">
-                      <span className="mr-2">•</span>
-                      <span>{ingredient}</span>
+                      <span className="mr-2 text-primary">✓</span>
+                      <span>
+                        {typeof ingredient === 'string' 
+                          ? ingredient 
+                          : `${ingredient.qty || ''} ${ingredient.unit || ''} ${ingredient.name || ''}`.trim()
+                        }
+                      </span>
                     </li>
                   ))}
                 </ul>
@@ -193,14 +207,14 @@ export default function RecipeDetail() {
               <CardTitle>Instructions</CardTitle>
             </CardHeader>
             <CardContent>
-              {recipe.instructions && recipe.instructions.length > 0 ? (
+              {(recipe.steps || recipe.instructions) && (recipe.steps || recipe.instructions).length > 0 ? (
                 <ol className="space-y-4">
-                  {recipe.instructions.map((instruction: string, index: number) => (
+                  {(recipe.steps || recipe.instructions).map((step: string, index: number) => (
                     <li key={index} className="flex gap-4">
-                      <span className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold">
+                      <span className="flex-shrink-0 w-8 h-8 bg-primary text-primary-foreground rounded-full flex items-center justify-center font-semibold text-sm">
                         {index + 1}
                       </span>
-                      <span className="pt-1">{instruction}</span>
+                      <span className="pt-1">{step}</span>
                     </li>
                   ))}
                 </ol>

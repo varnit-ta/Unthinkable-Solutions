@@ -3,6 +3,8 @@ package handlers
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,13 +12,22 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/varnit-ta/smart-recipe-generator/backend/internal/middleware"
 	"github.com/varnit-ta/smart-recipe-generator/backend/internal/service"
+	"github.com/varnit-ta/smart-recipe-generator/backend/internal/vision"
 )
 
 type Handler struct {
-	Service *service.Service
+	Service       *service.Service
+	VisionService vision.VisionService
+	MaxImageBytes int64
 }
 
-func New(s *service.Service) *Handler { return &Handler{Service: s} }
+func New(s *service.Service, vs vision.VisionService, maxImageMB int) *Handler {
+	return &Handler{
+		Service:       s,
+		VisionService: vs,
+		MaxImageBytes: int64(maxImageMB) * 1024 * 1024,
+	}
+}
 
 func (h *Handler) ListRecipes(w http.ResponseWriter, r *http.Request) {
 	// Parse query params
@@ -45,14 +56,21 @@ func (h *Handler) ListRecipes(w http.ResponseWriter, r *http.Request) {
 	}
 	recipes, err := h.Service.SearchAndFilterRecipes(r.Context(), q, diet, difficulty, maxTimePtr, cuisine, limit, offset)
 	if err != nil {
+		// Log the actual error
+		println("SearchAndFilterRecipes error:", err.Error())
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "database error"})
 		return
 	}
+	// Convert to response format
+	response := make([]RecipeDetailResponse, len(recipes))
+	for i, r := range recipes {
+		response[i] = toSearchRecipeResponse(r)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(recipes)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 func (h *Handler) GetRecipe(w http.ResponseWriter, r *http.Request) {
@@ -65,9 +83,10 @@ func (h *Handler) GetRecipe(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "recipe not found"})
 		return
 	}
+	response := toRecipeDetailResponse(recipe)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(recipe)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 type MatchRequest struct {
@@ -114,9 +133,21 @@ func (h *Handler) Match(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
+	// Convert to response format
+	type RecipeWithScoreResponse struct {
+		RecipeDetailResponse
+		Score int `json:"score"`
+	}
+	response := make([]RecipeWithScoreResponse, len(recipes))
+	for i, r := range recipes {
+		response[i] = RecipeWithScoreResponse{
+			RecipeDetailResponse: toSearchRecipeResponse(r.SearchRecipesRow),
+			Score:                r.Score,
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(recipes)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 type RatingRequest struct {
@@ -223,42 +254,157 @@ func (h *Handler) ListFavorites(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
+	// Convert to response format
+	response := make([]FavoriteRecipeResponse, len(list))
+	for i, fav := range list {
+		response[i] = toFavoriteRecipeResponse(fav)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(list)
+	_ = json.NewEncoder(w).Encode(response)
 }
 
-// DetectIngredients is a stub that accepts an image and returns mocked detections.
-func (h *Handler) DetectIngredients(w http.ResponseWriter, r *http.Request) {
-	// Accept multipart form with key "image"
-	if err := r.ParseMultipartForm(10 << 20); err != nil { // 10MB
-		http.Error(w, "bad request", 400)
+func (h *Handler) IsFavorite(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	recipeID, err := strconv.Atoi(idStr)
+	if err != nil || recipeID <= 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
-	file, header, err := r.FormFile("image")
+	v := r.Context().Value(middleware.UserIDKey)
+	id, ok := v.(int)
+	if !ok || id <= 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "unauthorized"})
+		return
+	}
+	isFav, err := h.Service.IsFavorite(r.Context(), id, recipeID)
 	if err != nil {
-		http.Error(w, "bad request", 400)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
-	}
-	_ = file.Close()
-	name := ""
-	if header != nil {
-		name = strings.ToLower(header.Filename)
-	}
-	detected := []string{}
-	// naive string contains to mock detections
-	keywords := []string{"tomato", "chicken", "onion", "garlic", "egg", "cheese", "banana", "pepper", "rice", "pasta"}
-	for _, k := range keywords {
-		if strings.Contains(name, k) {
-			detected = append(detected, k)
-		}
-	}
-	if len(detected) == 0 {
-		// default stub outputs
-		detected = []string{"onion", "salt"}
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"detectedIngredients": detected})
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]bool{"isFavorite": isFav})
+}
+
+// DetectIngredients accepts an image and uses vision AI to detect ingredients
+func (h *Handler) DetectIngredients(w http.ResponseWriter, r *http.Request) {
+	// Check if vision service is available
+	if h.VisionService == nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"message":             "vision service not configured",
+			"detectedIngredients": []string{},
+		})
+		return
+	}
+
+	// Parse multipart form with size limit
+	if err := r.ParseMultipartForm(h.MaxImageBytes); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "image too large or invalid form data",
+		})
+		return
+	}
+
+	// Get image file
+	file, header, err := r.FormFile("image")
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "no image file provided",
+		})
+		return
+	}
+	defer file.Close()
+
+	// Validate file type
+	filename := ""
+	if header != nil {
+		filename = header.Filename
+		contentType := header.Header.Get("Content-Type")
+		if !isValidImageType(contentType) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"message": "invalid image format. Supported: JPEG, PNG, GIF, WebP",
+			})
+			return
+		}
+	}
+
+	// Read image data
+	imageData, err := io.ReadAll(file)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "failed to read image",
+		})
+		return
+	}
+
+	// Check image size
+	if len(imageData) == 0 {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(w).Encode(map[string]string{
+			"message": "empty image file",
+		})
+		return
+	}
+
+	// Detect ingredients using vision service
+	result, err := h.VisionService.DetectIngredients(r.Context(), imageData, filename)
+	if err != nil {
+		// Log error but return graceful response
+		fmt.Printf("Vision API error: %v\n", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"detectedIngredients": []string{},
+			"message":             "Could not detect ingredients. Please try again or add them manually.",
+			"error":               err.Error(),
+		})
+		return
+	}
+
+	// Return successful response
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"detectedIngredients": result.Ingredients,
+		"confidence":          result.Confidence,
+		"provider":            result.Provider,
+		"caption":             result.RawResponse,
+	})
+}
+
+// isValidImageType checks if the content type is a valid image format
+func isValidImageType(contentType string) bool {
+	validTypes := []string{
+		"image/jpeg",
+		"image/jpg",
+		"image/png",
+		"image/gif",
+		"image/webp",
+	}
+	for _, t := range validTypes {
+		if strings.Contains(strings.ToLower(contentType), t) {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *Handler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
@@ -283,7 +429,19 @@ func (h *Handler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
+	// Convert to response format
+	type RecipeWithScoreResponse struct {
+		RecipeDetailResponse
+		Score int `json:"score"`
+	}
+	response := make([]RecipeWithScoreResponse, len(list))
+	for i, r := range list {
+		response[i] = RecipeWithScoreResponse{
+			RecipeDetailResponse: toSearchRecipeResponse(r.SearchRecipesRow),
+			Score:                r.Score,
+		}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(list)
+	_ = json.NewEncoder(w).Encode(response)
 }

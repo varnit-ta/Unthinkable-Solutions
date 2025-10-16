@@ -6,14 +6,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '../components/ui/button'
 import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
-import { Heart, Clock, Users, LogIn } from 'lucide-react'
+import { Heart, Clock, Users, LogIn, X } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function FavoritesPage() {
   const { token } = useAuth()
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
+  const fetchFavorites = () => {
     if (!token) {
       setLoading(false)
       return
@@ -24,7 +25,23 @@ export default function FavoritesPage() {
       .then((l) => setList(l as any[]))
       .catch(() => setList([]))
       .finally(() => setLoading(false))
+  }
+
+  useEffect(() => {
+    fetchFavorites()
   }, [token])
+
+  const handleRemoveFavorite = async (recipeId: number) => {
+    if (!token) return
+
+    try {
+      await api.removeFavorite(token, recipeId)
+      setList(prev => prev.filter(recipe => (recipe.recipe_id || recipe.recipeId || recipe.id) !== recipeId))
+      toast.success('Removed from favorites')
+    } catch (error) {
+      toast.error('Failed to remove favorite')
+    }
+  }
 
   if (!token) {
     return (
@@ -84,55 +101,70 @@ export default function FavoritesPage() {
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {list.map((recipe: any) => (
-              <Card key={recipe.recipeId || recipe.id} className="hover:shadow-lg transition-shadow">
-                <CardHeader>
-                  <div className="flex items-start justify-between mb-2">
-                    <CardTitle className="text-lg line-clamp-2">
-                      {recipe.title || `Recipe ${recipe.recipeId}`}
-                    </CardTitle>
-                    {recipe.averageRating && (
-                      <Badge variant="secondary" className="ml-2">
-                        ⭐ {recipe.averageRating.toFixed(1)}
-                      </Badge>
-                    )}
-                  </div>
-                  <CardDescription className="line-clamp-2">
-                    {recipe.description || 'Delicious recipe to try'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="flex flex-wrap gap-2">
-                    {recipe.cuisine && (
-                      <Badge variant="outline">{recipe.cuisine}</Badge>
-                    )}
-                    {recipe.difficulty && (
-                      <Badge variant="outline">{recipe.difficulty}</Badge>
-                    )}
-                    {recipe.dietType && (
-                      <Badge variant="outline">{recipe.dietType}</Badge>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <Clock className="h-4 w-4" />
-                      <span>{recipe.totalTime || recipe.cookTime || 30} min</span>
-                    </div>
-                    {recipe.servings && (
-                      <div className="flex items-center gap-1">
-                        <Users className="h-4 w-4" />
-                        <span>{recipe.servings} servings</span>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-                <CardFooter>
-                  <Button asChild className="w-full">
-                    <Link to={`/recipes/${recipe.recipeId || recipe.id}`}>View Recipe</Link>
+            {list.map((recipe: any) => {
+              const recipeId = recipe.recipe_id || recipe.recipeId || recipe.id
+              return (
+                <Card key={recipeId} className="hover:shadow-lg transition-all hover:-translate-y-1 duration-200 relative">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 z-10"
+                    onClick={() => handleRemoveFavorite(recipeId)}
+                  >
+                    <X className="h-5 w-5" />
                   </Button>
-                </CardFooter>
-              </Card>
-            ))}
+                  <CardHeader>
+                    <div className="flex items-start justify-between mb-2 pr-8">
+                      <CardTitle className="text-lg line-clamp-2">
+                        {recipe.title || `Recipe ${recipeId}`}
+                      </CardTitle>
+                      {recipe.average_rating && parseFloat(recipe.average_rating) > 0 && (
+                        <Badge variant="secondary" className="ml-2 shrink-0">
+                          ⭐ {parseFloat(recipe.average_rating).toFixed(1)}
+                        </Badge>
+                      )}
+                    </div>
+                    {recipe.description && (
+                      <CardDescription className="line-clamp-2">
+                        {recipe.description}
+                      </CardDescription>
+                    )}
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex flex-wrap gap-2">
+                      {recipe.cuisine && (
+                        <Badge variant="outline">🍽️ {recipe.cuisine}</Badge>
+                      )}
+                      {recipe.difficulty && (
+                        <Badge variant="secondary">{recipe.difficulty}</Badge>
+                      )}
+                      {recipe.diet_type && (
+                        <Badge variant="outline">{recipe.diet_type}</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      {(recipe.total_time_minutes || recipe.cook_time_minutes) && (
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-4 w-4" />
+                          <span>{recipe.total_time_minutes || recipe.cook_time_minutes} min</span>
+                        </div>
+                      )}
+                      {recipe.servings && recipe.servings > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Users className="h-4 w-4" />
+                          <span>{recipe.servings}</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                  <CardFooter className="flex gap-2">
+                    <Button asChild className="flex-1">
+                      <Link to={`/recipes/${recipeId}`}>View Recipe</Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              )
+            })}
           </div>
         )}
       </div>

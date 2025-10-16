@@ -14,6 +14,7 @@ import (
 	"github.com/varnit-ta/smart-recipe-generator/backend/internal/handlers"
 	"github.com/varnit-ta/smart-recipe-generator/backend/internal/middleware"
 	"github.com/varnit-ta/smart-recipe-generator/backend/internal/service"
+	"github.com/varnit-ta/smart-recipe-generator/backend/internal/vision"
 )
 
 func main() {
@@ -66,15 +67,24 @@ func main() {
 		log.Fatalf("could not connect to db after %d attempts: %v", attempts, pingErr)
 	}
 
+	// Initialize vision service
+	var visionService vision.VisionService
+	if cfg.HuggingFaceAPIKey != "" {
+		visionService = vision.NewHuggingFaceService(cfg.HuggingFaceAPIKey)
+		log.Printf("Hugging Face vision service initialized")
+	} else {
+		log.Printf("WARNING: HUGGINGFACE_API_KEY not set - vision detection will not work")
+	}
+
 	svc := service.NewService(db)
-	h := handlers.New(svc)
+	h := handlers.New(svc, visionService, cfg.MaxImageSizeMB)
 	authH := &handlers.AuthHandler{Service: svc, JWTSecret: cfg.JWTSecret, JWTExpiry: cfg.JWTExpiryHours}
 
 	r := chi.NewRouter()
 
 	// CORS middleware
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:5173", "http://localhost:3000", "http://localhost:4173"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		ExposedHeaders:   []string{"Link"},
@@ -97,6 +107,7 @@ func main() {
 	r.With(middleware.JWTAuth(cfg.JWTSecret)).Post("/favorites/{id}", h.AddFavorite)
 	r.With(middleware.JWTAuth(cfg.JWTSecret)).Delete("/favorites/{id}", h.RemoveFavorite)
 	r.With(middleware.JWTAuth(cfg.JWTSecret)).Get("/favorites", h.ListFavorites)
+	r.With(middleware.JWTAuth(cfg.JWTSecret)).Get("/favorites/{id}", h.IsFavorite)
 	r.With(middleware.JWTAuth(cfg.JWTSecret)).Get("/suggestions", h.GetSuggestions)
 
 	addr := ":" + cfg.Port
