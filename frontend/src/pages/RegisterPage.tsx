@@ -1,3 +1,13 @@
+/**
+ * Register Page Component
+ * 
+ * Provides user registration interface with username, email, and password inputs.
+ * Handles account creation, automatic login, and redirect to home on success.
+ * Includes link to login page for existing users.
+ * 
+ * @module RegisterPage
+ */
+
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -9,6 +19,14 @@ import { Button } from '../components/ui/button'
 import { ChefHat, User, Mail, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
+/**
+ * RegisterPage Component
+ * 
+ * Renders a registration form with username, email, and password fields.
+ * Creates new user account and automatically logs in upon successful registration.
+ * 
+ * @returns {JSX.Element} Registration page component
+ */
 export default function RegisterPage() {
   const { setToken } = useAuth()
   const navigate = useNavigate()
@@ -17,6 +35,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  /**
+   * Handle form submission for user registration
+   * 
+   * @param {React.FormEvent} e - Form submission event
+   */
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)

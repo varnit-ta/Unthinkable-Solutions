@@ -1,3 +1,17 @@
+/**
+ * Favorites Page Component
+ * 
+ * Displays the user's saved favorite recipes.
+ * Features include:
+ * - Grid layout of favorite recipes
+ * - Quick removal from favorites
+ * - Loading states with skeletons
+ * - Authentication check with redirect prompt
+ * - Direct navigation to recipe details
+ * 
+ * @module FavoritesPage
+ */
+
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -9,11 +23,22 @@ import { Skeleton } from '../components/ui/skeleton'
 import { Heart, Clock, Users, LogIn, X } from 'lucide-react'
 import { toast } from 'sonner'
 
+/**
+ * FavoritesPage Component
+ * 
+ * Protected page that shows authenticated user's favorite recipes.
+ * Requires login to access.
+ * 
+ * @returns {JSX.Element} Favorites page component
+ */
 export default function FavoritesPage() {
   const { token } = useAuth()
   const [list, setList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
+  /**
+   * Fetch user's favorite recipes from API
+   */
   const fetchFavorites = () => {
     if (!token) {
       setLoading(false)
@@ -31,6 +56,11 @@ export default function FavoritesPage() {
     fetchFavorites()
   }, [token])
 
+  /**
+   * Remove a recipe from user's favorites
+   * 
+   * @param {number} recipeId - ID of the recipe to remove
+   */
   const handleRemoveFavorite = async (recipeId: number) => {
     if (!token) return
 

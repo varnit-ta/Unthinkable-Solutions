@@ -1,3 +1,18 @@
+/**
+ * Recipe Detail Page Component
+ * 
+ * Displays comprehensive information about a single recipe including:
+ * - Title, description, and metadata (cuisine, difficulty, diet)
+ * - Cooking time and servings
+ * - Complete ingredients list
+ * - Step-by-step instructions
+ * - Rating system (1-5 stars)
+ * - Favorite toggle
+ * - Tags
+ * 
+ * @module RecipeDetail
+ */
+
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { api } from '../api'
@@ -9,6 +24,14 @@ import { Skeleton } from '../components/ui/skeleton'
 import { ArrowLeft, Clock, Users, ChefHat, Heart, Star } from 'lucide-react'
 import { toast } from 'sonner'
 
+/**
+ * RecipeDetail Component
+ * 
+ * Fetches and displays detailed information for a specific recipe.
+ * Allows authenticated users to rate and favorite the recipe.
+ * 
+ * @returns {JSX.Element} Recipe detail page component
+ */
 export default function RecipeDetail() {
   const { id } = useParams()
   const { token } = useAuth()
@@ -27,7 +50,6 @@ export default function RecipeDetail() {
       .catch(() => setRecipe(null))
       .finally(() => setLoading(false))
     
-    // Fetch favorite status if user is logged in
     if (token) {
       api.isFavorite(token, Number(id))
         .then(res => setIsFavorite(res.isFavorite))
@@ -35,6 +57,9 @@ export default function RecipeDetail() {
     }
   }, [id, token])
 
+  /**
+   * Toggle favorite status for the current recipe
+   */
   const handleFavorite = async () => {
     if (!token) {
       toast.error('Please login to add favorites')
@@ -57,6 +82,11 @@ export default function RecipeDetail() {
     }
   }
 
+  /**
+   * Submit a rating for the current recipe
+   * 
+   * @param {number} value - Rating value (1-5)
+   */
   const handleRating = async (value: number) => {
     if (!token) {
       toast.error('Please login to rate recipes')
@@ -69,7 +99,6 @@ export default function RecipeDetail() {
       await api.rate(token, Number(id), value)
       setRating(value)
       toast.success('Rating submitted!')
-      // Refresh recipe to get updated average rating
       const updated = await api.getRecipe(Number(id))
       setRecipe(updated)
     } catch (error) {

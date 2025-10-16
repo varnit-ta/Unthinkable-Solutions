@@ -1,3 +1,18 @@
+/**
+ * Suggestions Page Component
+ * 
+ * Displays personalized recipe recommendations based on user preferences.
+ * Features include:
+ * - AI-powered recipe suggestions based on favorites and ratings
+ * - Visual indicators for suggested recipes
+ * - Grid layout with recipe cards
+ * - Loading states with skeletons
+ * - Authentication check with redirect prompt
+ * - Direct navigation to recipe details
+ * 
+ * @module SuggestionsPage
+ */
+
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -8,6 +23,15 @@ import { Badge } from '../components/ui/badge'
 import { Skeleton } from '../components/ui/skeleton'
 import { Lightbulb, Clock, Users, LogIn, Sparkles } from 'lucide-react'
 
+/**
+ * SuggestionsPage Component
+ * 
+ * Protected page that shows personalized recipe suggestions.
+ * Uses backend recommendation engine based on user behavior.
+ * Requires login to access.
+ * 
+ * @returns {JSX.Element} Suggestions page component
+ */
 export default function SuggestionsPage() {
   const { token } = useAuth()
   const [list, setList] = useState<any[]>([])

@@ -1,3 +1,17 @@
+/**
+ * Recipes List Page Component
+ * 
+ * Displays a searchable and filterable list of recipes.
+ * Features include:
+ * - Search by recipe name
+ * - Filter by diet, difficulty, cuisine, and cooking time
+ * - Toggle favorites (for authenticated users)
+ * - Responsive grid layout
+ * - Loading states with skeletons
+ * 
+ * @module RecipesList
+ */
+
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -11,6 +25,14 @@ import { Skeleton } from '../components/ui/skeleton'
 import { Search, Clock, Users, ChefHat, Heart } from 'lucide-react'
 import { toast } from 'sonner'
 
+/**
+ * RecipesList Component
+ * 
+ * Main component for browsing and searching recipes with advanced filtering options.
+ * Supports favorite management for authenticated users.
+ * 
+ * @returns {JSX.Element} Recipes list page component
+ */
 export default function RecipesList() {
   const { token } = useAuth()
   const navigate = useNavigate()
@@ -23,6 +45,10 @@ export default function RecipesList() {
   const [maxTime, setMaxTime] = useState('')
   const [favorites, setFavorites] = useState<Set<number>>(new Set())
 
+  /**
+   * Fetch recipes from API with current filter settings
+   * Also fetches favorite status for authenticated users
+   */
   const fetchRecipes = async () => {
     setLoading(true)
     const params = new URLSearchParams({ limit: '50' })
@@ -36,7 +62,6 @@ export default function RecipesList() {
       const data = await api.listRecipes(params)
       setRecipes(data)
       
-      // Fetch favorite status for all recipes if user is logged in
       if (token && data.length > 0) {
         const favoriteChecks = await Promise.allSettled(
           data.map((recipe: any) => 
@@ -63,10 +88,16 @@ export default function RecipesList() {
     fetchRecipes()
   }, [token])
 
+  /**
+   * Handle search button click
+   */
   const handleSearch = () => {
     fetchRecipes()
   }
 
+  /**
+   * Clear all filters and reset to default recipe list
+   */
   const clearFilters = () => {
     setSearch('')
     setDiet('')
@@ -77,8 +108,14 @@ export default function RecipesList() {
     api.listRecipes(params).then(setRecipes).catch(() => setRecipes([]))
   }
 
+  /**
+   * Toggle favorite status for a recipe
+   * 
+   * @param {number} recipeId - ID of the recipe to toggle
+   * @param {React.MouseEvent} e - Click event
+   */
   const handleFavoriteToggle = async (recipeId: number, e: React.MouseEvent) => {
-    e.preventDefault() // Prevent navigation to recipe detail
+    e.preventDefault()
     
     if (!token) {
       toast.error('Please login to add favorites')

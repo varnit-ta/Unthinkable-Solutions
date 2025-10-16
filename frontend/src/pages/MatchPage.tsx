@@ -1,3 +1,18 @@
+/**
+ * Match Page Component
+ * 
+ * AI-powered ingredient detection and recipe matching page.
+ * Features include:
+ * - Image upload with preview
+ * - AI-based ingredient detection using vision API
+ * - Manual ingredient editing (add/remove)
+ * - Recipe matching based on detected ingredients
+ * - Filter matching results by diet, difficulty, cuisine, and time
+ * - Display confidence scores and AI captions
+ * 
+ * @module MatchPage
+ */
+
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api'
@@ -9,6 +24,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Upload, X, Search, Clock, Users, Camera } from 'lucide-react'
 import { toast } from 'sonner'
 
+/**
+ * MatchPage Component
+ * 
+ * Allows users to upload images of ingredients and find matching recipes.
+ * Uses AI vision API to detect ingredients and provides confidence metrics.
+ * 
+ * @returns {JSX.Element} Match page component
+ */
 export default function MatchPage() {
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -25,6 +48,11 @@ export default function MatchPage() {
   const [cuisine, setCuisine] = useState('')
   const [maxTime, setMaxTime] = useState('')
 
+  /**
+   * Handle file input change and generate preview
+   * 
+   * @param {React.ChangeEvent<HTMLInputElement>} e - File input change event
+   */
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0] ?? null
     setFile(selectedFile)
@@ -40,6 +68,9 @@ export default function MatchPage() {
     }
   }
 
+  /**
+   * Clear uploaded file and reset all state
+   */
   const clearFile = () => {
     setFile(null)
     setPreview(null)
@@ -49,6 +80,9 @@ export default function MatchPage() {
     setCaption(null)
   }
 
+  /**
+   * Use AI to detect ingredients from uploaded image
+   */
   const detectIngredients = async () => {
     if (!file) return
     setLoading(true)
@@ -77,6 +111,9 @@ export default function MatchPage() {
     }
   }
 
+  /**
+   * Find recipes that match detected ingredients with optional filters
+   */
   const findMatchingRecipes = async () => {
     if (detected.length === 0) {
       toast.error('No ingredients detected')
@@ -103,10 +140,20 @@ export default function MatchPage() {
     }
   }
 
+  /**
+   * Remove an ingredient from detected list
+   * 
+   * @param {string} ingredient - Ingredient to remove
+   */
   const removeIngredient = (ingredient: string) => {
     setDetected(detected.filter(d => d !== ingredient))
   }
 
+  /**
+   * Manually add an ingredient to the list
+   * 
+   * @param {string} ingredient - Ingredient to add
+   */
   const addIngredient = (ingredient: string) => {
     if (ingredient && !detected.includes(ingredient)) {
       setDetected([...detected, ingredient])

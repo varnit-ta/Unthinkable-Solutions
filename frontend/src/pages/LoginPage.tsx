@@ -1,3 +1,13 @@
+/**
+ * Login Page Component
+ * 
+ * Provides user authentication interface with email and password inputs.
+ * Handles form submission, error display, and redirects to home on success.
+ * Includes link to registration page for new users.
+ * 
+ * @module LoginPage
+ */
+
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { api } from '../api'
@@ -9,6 +19,14 @@ import { Button } from '../components/ui/button'
 import { ChefHat, Mail, Lock } from 'lucide-react'
 import { toast } from 'sonner'
 
+/**
+ * LoginPage Component
+ * 
+ * Renders a login form with email and password fields.
+ * Validates credentials against the backend API and stores authentication token.
+ * 
+ * @returns {JSX.Element} Login page component
+ */
 export default function LoginPage() {
   const { setToken } = useAuth()
   const navigate = useNavigate()
@@ -16,6 +34,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
 
+  /**
+   * Handle form submission for user login
+   * 
+   * @param {React.FormEvent} e - Form submission event
+   */
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)

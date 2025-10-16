@@ -1,3 +1,12 @@
+/**
+ * Main Application Component
+ * 
+ * This module contains the root App component and navigation system.
+ * Handles routing, authentication-aware navigation, and layout structure.
+ * 
+ * @module App
+ */
+
 import { Routes, Route, Link, Navigate, useNavigate, useLocation } from 'react-router-dom'
 import './App.css'
 import { ChefHat, Home, Search, Heart, Lightbulb, LogIn, UserPlus, LogOut, User } from 'lucide-react'
@@ -20,6 +29,15 @@ import SuggestionsPage from './pages/SuggestionsPage'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 
+/**
+ * Navigation Component
+ * 
+ * Renders the top navigation bar with responsive design.
+ * Displays different menu items based on authentication status.
+ * Highlights active routes and provides user account menu.
+ * 
+ * @returns {JSX.Element} Navigation bar component
+ */
 function Navigation() {
   const { token, setToken } = useAuth()
   const navigate = useNavigate()
@@ -158,6 +176,15 @@ function Navigation() {
   )
 }
 
+/**
+ * Home Page Component
+ * 
+ * Landing page that introduces the application features.
+ * Provides quick navigation to main sections: Browse Recipes, Match Ingredients, and Get Suggestions.
+ * Adapts content based on user authentication status.
+ * 
+ * @returns {JSX.Element} Home page component
+ */
 function HomePage() {
   const { token } = useAuth()
   
@@ -212,6 +239,15 @@ function HomePage() {
   )
 }
 
+/**
+ * Main App Component
+ * 
+ * Root component that sets up the application routing structure.
+ * Renders the navigation bar and defines all application routes.
+ * Includes fallback route for 404 handling.
+ * 
+ * @returns {JSX.Element} Main application component
+ */
 function App() {
   return (
     <div className="min-h-screen bg-background">
