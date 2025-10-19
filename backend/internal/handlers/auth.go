@@ -11,16 +11,16 @@ import (
 
 // AuthHandler manages user authentication and registration endpoints.
 type AuthHandler struct {
-	Service   *service.Service // Business logic service
-	JWTSecret string           // Secret key for signing JWTs
-	JWTExpiry int              // Token expiration time in seconds
+	Service   *service.Service
+	JWTSecret string
+	JWTExpiry int
 }
 
 // RegisterRequest contains user registration information.
 type RegisterRequest struct {
-	Username string `json:"username"` // User's chosen username
-	Email    string `json:"email"`    // User's email address
-	Password string `json:"password"` // Plain text password (will be hashed)
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // Register handles POST /api/auth/register to create new user accounts.
@@ -63,8 +63,8 @@ func (a *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
 
 // LoginRequest contains user login credentials.
 type LoginRequest struct {
-	Email    string `json:"email"`    // User's email address
-	Password string `json:"password"` // Plain text password
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 // Login handles POST /api/auth/login to authenticate existing users.

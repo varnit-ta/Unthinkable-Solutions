@@ -124,7 +124,7 @@ export const api = {
   /**
    * Detect ingredients from an uploaded image using AI
    * @param {File} file - Image file to analyze
-   * @returns {Promise<object>} Detection results with ingredients and metadata
+   * @returns {Promise<object>} Detection results with ingredients, cuisine, dish type, and metadata
    */
   detectIngredients: (file: File) => {
     const form = new FormData()
@@ -132,9 +132,16 @@ export const api = {
 
     return request<{
       detectedIngredients: string[]
+      cuisine?: string
+      dishType?: string
       confidence?: number
       provider?: string
       caption?: string
+      details?: {
+        ingredient_confidences?: Record<string, number>
+        cuisine_confidence?: number
+        dish_confidence?: number
+      }
       message?: string
     }>('/detect-ingredients', { method: 'POST', body: form })
   },

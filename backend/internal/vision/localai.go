@@ -18,8 +18,8 @@ import (
 // LocalAIService implements VisionService using a local Python AI service.
 // It communicates with a FastAPI server running the Salesforce BLIP model.
 type LocalAIService struct {
-	serviceURL string       // URL of the Python AI service
-	httpClient *http.Client // HTTP client with timeout configuration
+	serviceURL string
+	httpClient *http.Client
 }
 
 // NewLocalAIService creates a new local AI service instance.
@@ -46,12 +46,15 @@ func NewLocalAIService(serviceURL string) *LocalAIService {
 
 // AIServiceResponse represents the structure of the response from the Python AI service.
 type AIServiceResponse struct {
-	Success     bool     `json:"success"`
-	Ingredients []string `json:"ingredients"` // List of detected ingredients
-	Caption     string   `json:"caption"`     // Raw caption from the model
-	Confidence  float64  `json:"confidence"`
-	Model       string   `json:"model"`
-	Device      string   `json:"device"`
+	Success     bool                   `json:"success"`
+	Ingredients []string               `json:"ingredients"`
+	Cuisine     string                 `json:"cuisine"`
+	DishType    string                 `json:"dish_type"`
+	Caption     string                 `json:"caption"`
+	Confidence  float64                `json:"confidence"`
+	Details     map[string]interface{} `json:"details,omitempty"`
+	Model       map[string]string      `json:"model,omitempty"`
+	Device      string                 `json:"device"`
 }
 
 // DetectIngredients analyzes an image using the local Python AI service
@@ -73,10 +76,8 @@ func (s *LocalAIService) DetectIngredients(ctx context.Context, imageData []byte
 	body := &bytes.Buffer{}
 	writer := multipart.NewWriter(body)
 
-	// Determine content type from filename extension
 	contentType := getContentTypeFromFilename(filename)
 
-	// Create form file with proper content type
 	h := make(textproto.MIMEHeader)
 	h.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename="%s"`, filename))
 	h.Set("Content-Type", contentType)
@@ -132,10 +133,8 @@ func (s *LocalAIService) DetectIngredients(ctx context.Context, imageData []byte
 		return nil, &DetectionError{Provider: "local-ai", Err: fmt.Errorf("AI service returned success=false")}
 	}
 
-	// Use ingredients from the AI service response if available
 	ingredients := aiResp.Ingredients
 
-	// Fallback: if no ingredients in response, parse from caption
 	if len(ingredients) == 0 && aiResp.Caption != "" {
 		ingredients = ParseIngredientsFromText(aiResp.Caption)
 		fmt.Printf("No ingredients in response, parsed %d from caption\n", len(ingredients))
@@ -143,15 +142,25 @@ func (s *LocalAIService) DetectIngredients(ctx context.Context, imageData []byte
 
 	fmt.Printf("Local AI service detected %d ingredients: %v\n", len(ingredients), ingredients)
 
+	modelInfo := "local-ai"
+	if aiResp.Model != nil {
+		if clipModel, ok := aiResp.Model["clip"]; ok {
+			modelInfo = clipModel
+		}
+	}
+
 	result := &DetectionResult{
 		Ingredients: ingredients,
 		RawResponse: aiResp.Caption,
 		Confidence:  aiResp.Confidence,
 		Provider:    "local-ai",
 		Metadata: map[string]interface{}{
-			"model":       aiResp.Model,
+			"model":       modelInfo,
 			"device":      aiResp.Device,
 			"caption":     aiResp.Caption,
+			"cuisine":     aiResp.Cuisine,
+			"dish_type":   aiResp.DishType,
+			"details":     aiResp.Details,
 			"filename":    filename,
 			"image_size":  len(imageData),
 			"detected_at": time.Now().UTC().Format(time.RFC3339),
@@ -178,7 +187,6 @@ func getContentTypeFromFilename(filename string) string {
 	case ".tiff", ".tif":
 		return "image/tiff"
 	default:
-		// Default to jpeg if unknown
 		return "image/jpeg"
 	}
 }

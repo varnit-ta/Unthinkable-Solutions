@@ -51,6 +51,7 @@ docker-build:
 	@echo "Building docker images (if Dockerfile present)..."
 	-@docker build -t unthinkable-frontend ./frontend
 	-@docker build -t unthinkable-backend ./backend
+	-@docker build -t unthinkable-ai-service ./ai-service
 
 docker-up:
 	@echo "Starting docker compose..."

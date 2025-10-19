@@ -19,7 +19,7 @@ import (
 // It wraps the database queries and implements complex operations like scoring,
 // filtering, and recommendations.
 type Service struct {
-	q *db.Queries // SQLC-generated database queries
+	q *db.Queries
 }
 
 // NewService creates a new Service instance with the provided database connection.
@@ -35,9 +35,9 @@ func NewService(conn db.DBTX) *Service {
 // RecipeSummary represents a recipe with its match score.
 // Used for ingredient-based recipe matching results.
 type RecipeSummary struct {
-	ID    int32  `json:"id"`    // Recipe identifier
-	Title string `json:"title"` // Recipe name
-	Score int    `json:"score"` // Match score based on ingredient overlap
+	ID    int32  `json:"id"`
+	Title string `json:"title"`
+	Score int    `json:"score"`
 }
 
 // ListRecipes retrieves a paginated list of recipes.
@@ -207,19 +207,19 @@ func (s *Service) SearchAndFilterRecipes(
 
 // MatchFilters defines optional filters for ingredient-based recipe matching.
 type MatchFilters struct {
-	Diet           string // Dietary restriction (e.g., "vegetarian")
-	Difficulty     string // Difficulty level ("easy", "medium", "hard")
-	MaxTimeMinutes *int   // Maximum cooking time in minutes
-	Cuisine        string // Cuisine type filter
-	Limit          int    // Maximum results to return
-	Offset         int    // Pagination offset
+	Diet           string
+	Difficulty     string
+	MaxTimeMinutes *int
+	Cuisine        string
+	Limit          int
+	Offset         int
 }
 
 // RecipeWithScore extends a recipe search result with a relevance score.
 // Used for filtered matching operations.
 type RecipeWithScore struct {
-	db.SearchRecipesRow     // Embedded recipe data
-	Score               int `json:"score"` // Ingredient match score
+	db.SearchRecipesRow
+	Score int `json:"score"`
 }
 
 // MatchWithFilters combines filtering and ingredient-based scoring.

@@ -41,6 +41,10 @@ export default function MatchPage() {
   const [loadingRecipes, setLoadingRecipes] = useState(false)
   const [confidence, setConfidence] = useState<number | null>(null)
   const [caption, setCaption] = useState<string | null>(null)
+  const [detectedCuisine, setDetectedCuisine] = useState<string | null>(null)
+  const [detectedDishType, setDetectedDishType] = useState<string | null>(null)
+  const [cuisineConfidence, setCuisineConfidence] = useState<number | null>(null)
+  const [dishConfidence, setDishConfidence] = useState<number | null>(null)
   
   // Filters
   const [diet, setDiet] = useState('')
@@ -78,6 +82,10 @@ export default function MatchPage() {
     setMatchedRecipes([])
     setConfidence(null)
     setCaption(null)
+    setDetectedCuisine(null)
+    setDetectedDishType(null)
+    setCuisineConfidence(null)
+    setDishConfidence(null)
   }
 
   /**
@@ -91,10 +99,16 @@ export default function MatchPage() {
       setDetected(res.detectedIngredients || [])
       setConfidence(res.confidence || null)
       setCaption(res.caption || null)
+      setDetectedCuisine(res.cuisine || null)
+      setDetectedDishType(res.dishType || null)
+      setCuisineConfidence(res.details?.cuisine_confidence || null)
+      setDishConfidence(res.details?.dish_confidence || null)
       
       if (res.detectedIngredients?.length > 0) {
         const confidencePercent = res.confidence ? Math.round(res.confidence * 100) : 0
-        toast.success(`Detected ${res.detectedIngredients.length} ingredients! (${confidencePercent}% confidence)`)
+        const cuisineInfo = res.cuisine ? ` | ${res.cuisine} cuisine` : ''
+        const dishInfo = res.dishType ? ` | ${res.dishType}` : ''
+        toast.success(`Detected ${res.detectedIngredients.length} ingredients! (${confidencePercent}% confidence${cuisineInfo}${dishInfo})`)
       } else if (res.message) {
         toast.warning(res.message)
       } else {
@@ -106,6 +120,10 @@ export default function MatchPage() {
       setDetected([])
       setConfidence(null)
       setCaption(null)
+      setDetectedCuisine(null)
+      setDetectedDishType(null)
+      setCuisineConfidence(null)
+      setDishConfidence(null)
     } finally {
       setLoading(false)
     }
@@ -234,8 +252,35 @@ export default function MatchPage() {
               {detected.length > 0 ? (
                 <>
                   {/* Show AI detection metadata */}
-                  {(confidence !== null || caption) && (
-                    <div className="mb-4 p-3 bg-muted rounded-lg space-y-2">
+                  {(confidence !== null || caption || detectedCuisine || detectedDishType) && (
+                    <div className="mb-4 p-4 bg-muted rounded-lg space-y-3">
+                      {/* Cuisine and Dish Type - Prominent Display */}
+                      {(detectedCuisine || detectedDishType) && (
+                        <div className="flex flex-wrap gap-2 pb-3 border-b">
+                          {detectedCuisine && (
+                            <Badge variant="default" className="text-sm">
+                              🌍 {detectedCuisine} Cuisine
+                              {cuisineConfidence && cuisineConfidence > 0.5 && (
+                                <span className="ml-1 opacity-75">
+                                  ({Math.round(cuisineConfidence * 100)}%)
+                                </span>
+                              )}
+                            </Badge>
+                          )}
+                          {detectedDishType && (
+                            <Badge variant="secondary" className="text-sm">
+                              🍽️ {detectedDishType}
+                              {dishConfidence && dishConfidence > 0.5 && (
+                                <span className="ml-1 opacity-75">
+                                  ({Math.round(dishConfidence * 100)}%)
+                                </span>
+                              )}
+                            </Badge>
+                          )}
+                        </div>
+                      )}
+                      
+                      {/* Overall Confidence */}
                       {confidence !== null && (
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">AI Confidence:</span>
@@ -244,6 +289,8 @@ export default function MatchPage() {
                           </Badge>
                         </div>
                       )}
+                      
+                      {/* Caption */}
                       {caption && (
                         <div className="text-xs text-muted-foreground">
                           <span className="font-medium">AI Caption:</span> "{caption}"

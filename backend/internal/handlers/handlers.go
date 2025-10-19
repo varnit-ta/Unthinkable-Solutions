@@ -19,9 +19,9 @@ import (
 
 // Handler manages HTTP requests for recipe-related operations.
 type Handler struct {
-	Service       *service.Service     // Business logic service
-	VisionService vision.VisionService // AI ingredient detection service
-	MaxImageBytes int64                // Maximum upload size in bytes
+	Service       *service.Service
+	VisionService vision.VisionService
+	MaxImageBytes int64
 }
 
 // New creates a Handler with configured services and limits.
@@ -121,7 +121,7 @@ func (h *Handler) GetRecipe(w http.ResponseWriter, r *http.Request) {
 
 // MatchRequest contains ingredients detected from image analysis.
 type MatchRequest struct {
-	DetectedIngredients []string `json:"detectedIngredients"` // List of ingredient names
+	DetectedIngredients []string `json:"detectedIngredients"`
 }
 
 // Match handles POST /api/match to find recipes matching ingredients.
@@ -188,8 +188,8 @@ func (h *Handler) Match(w http.ResponseWriter, r *http.Request) {
 
 // RatingRequest contains a user's recipe rating submission.
 type RatingRequest struct {
-	RecipeID int `json:"recipeId"` // Recipe being rated
-	Rating   int `json:"rating"`   // Numeric rating value
+	RecipeID int `json:"recipeId"`
+	Rating   int `json:"rating"`
 }
 
 // PostRating handles POST /api/ratings (requires authentication).
@@ -448,12 +448,29 @@ func (h *Handler) DetectIngredients(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+
+	cuisine, _ := result.Metadata["cuisine"].(string)
+	dishType, _ := result.Metadata["dish_type"].(string)
+	details, _ := result.Metadata["details"].(map[string]interface{})
+
+	response := map[string]interface{}{
 		"detectedIngredients": result.Ingredients,
 		"confidence":          result.Confidence,
 		"provider":            result.Provider,
 		"caption":             result.RawResponse,
-	})
+	}
+
+	if cuisine != "" {
+		response["cuisine"] = cuisine
+	}
+	if dishType != "" {
+		response["dishType"] = dishType
+	}
+	if details != nil {
+		response["details"] = details
+	}
+
+	_ = json.NewEncoder(w).Encode(response)
 }
 
 // isValidImageType validates that the uploaded file is a supported image format.

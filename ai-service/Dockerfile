@@ -8,9 +8,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY main.py .
 
-RUN python -c "from transformers import BlipProcessor, BlipForConditionalGeneration; \
+RUN python -c "from transformers import BlipProcessor, BlipForConditionalGeneration, CLIPProcessor, CLIPModel; \
     BlipProcessor.from_pretrained('Salesforce/blip-image-captioning-base'); \
-    BlipForConditionalGeneration.from_pretrained('Salesforce/blip-image-captioning-base')"
+    BlipForConditionalGeneration.from_pretrained('Salesforce/blip-image-captioning-base'); \
+    CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32'); \
+    CLIPModel.from_pretrained('openai/clip-vit-base-patch32')"
 
 EXPOSE 8000
 

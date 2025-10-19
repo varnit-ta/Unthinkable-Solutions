@@ -1,6 +1,6 @@
 """
 AI Ingredient Detection Service
-Fast, local ingredient detection using Salesforce BLIP model
+Fast, local ingredient detection using Salesforce BLIP and OpenAI CLIP models
 """
 import io
 import logging
@@ -10,7 +10,7 @@ from PIL import Image
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import torch
-from transformers import BlipProcessor, BlipForConditionalGeneration
+from transformers import BlipProcessor, BlipForConditionalGeneration, CLIPProcessor, CLIPModel
 import uvicorn
 
 logging.basicConfig(
@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="AI Ingredient Detection Service",
-    description="Local AI service for detecting ingredients from images",
-    version="1.0.0"
+    description="Local AI service for detecting ingredients from images using BLIP and CLIP",
+    version="2.0.0"
 )
 
 app.add_middleware(
@@ -33,28 +33,78 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-processor = None
-model = None
+blip_processor = None
+blip_model = None
+
+clip_processor = None
+clip_model = None
+
 device = None
+
+INGREDIENTS_LIST = [
+    # Vegetables
+    "tomato", "onion", "garlic", "potato", "carrot", "bell pepper", "chili pepper",
+    "ginger", "lettuce", "cabbage", "spinach", "mushroom", "broccoli", "cauliflower",
+    "cucumber", "zucchini", "eggplant", "corn", "peas", "beans", "celery", "leek",
+    "asparagus", "radish", "turnip", "beet", "pumpkin", "squash", "kale", "chard",
+    # Proteins
+    "chicken", "beef", "pork", "lamb", "fish", "salmon", "tuna", "shrimp", "prawns",
+    "crab", "lobster", "egg", "tofu", "tempeh", "bacon", "sausage", "ham",
+    # Dairy
+    "cheese", "mozzarella", "cheddar", "parmesan", "milk", "butter", "cream", "yogurt",
+    # Grains & Carbs
+    "rice", "pasta", "noodles", "bread", "flour", "quinoa", "couscous", "oats",
+    # Fruits
+    "lemon", "lime", "apple", "banana", "orange", "avocado", "mango", "pineapple",
+    "strawberry", "blueberry", "tomato", "coconut",
+    # Herbs & Spices
+    "basil", "parsley", "cilantro", "coriander", "mint", "thyme", "rosemary", "oregano",
+    "dill", "sage", "bay leaf", "cumin", "paprika", "turmeric", "curry",
+    # Condiments & Oils
+    "olive oil", "vegetable oil", "soy sauce", "vinegar", "salt", "pepper", "sugar",
+    "honey", "ketchup", "mustard", "mayonnaise",
+    # Nuts & Seeds
+    "almond", "cashew", "peanut", "walnut", "sesame seeds", "sunflower seeds",
+]
+
+CUISINE_LIST = [
+    "Italian", "Chinese", "Indian", "Mexican", "Thai", "Japanese",
+    "French", "Mediterranean", "American", "Korean", "Vietnamese",
+    "Greek", "Spanish", "Middle Eastern", "Turkish", "Lebanese"
+]
+
+DISH_TYPES = [
+    "salad", "soup", "curry", "pasta", "stir fry", "grilled meat", "roasted vegetables",
+    "sandwich", "pizza", "burger", "stew", "casserole", "rice dish", "noodle dish",
+    "seafood dish", "dessert", "breakfast", "appetizer", "main course"
+]
 
 
 def load_model():
-    """Load the Salesforce BLIP model on startup"""
-    global processor, model, device
+    """Load the Salesforce BLIP and OpenAI CLIP models on startup"""
+    global blip_processor, blip_model, clip_processor, clip_model, device
     
     try:
-        logger.info("Loading Salesforce BLIP model...")
-        
         device = "cuda" if torch.cuda.is_available() else "cpu"
         logger.info(f"Using device: {device}")
         
-        model_name = "Salesforce/blip-image-captioning-base"
-        processor = BlipProcessor.from_pretrained(model_name)
-        model = BlipForConditionalGeneration.from_pretrained(model_name).to(device)
+        # Load BLIP for captioning
+        logger.info("Loading Salesforce BLIP model for captioning...")
+        blip_model_name = "Salesforce/blip-image-captioning-base"
+        blip_processor = BlipProcessor.from_pretrained(blip_model_name)
+        blip_model = BlipForConditionalGeneration.from_pretrained(blip_model_name).to(device)
+        logger.info("BLIP model loaded successfully!")
         
-        logger.info("Model loaded successfully!")
+        # Load CLIP for ingredient detection
+        logger.info("Loading OpenAI CLIP model for ingredient detection...")
+        clip_model_name = "openai/clip-vit-base-patch32"
+        clip_processor = CLIPProcessor.from_pretrained(clip_model_name)
+        clip_model = CLIPModel.from_pretrained(clip_model_name).to(device)
+        logger.info("CLIP model loaded successfully!")
+        
+        logger.info("All models loaded successfully!")
     except Exception as e:
-        logger.error(f"Failed to load model: {str(e)}", exc_info=True)
+        logger.error(f"Failed to load models: {str(e)}", exc_info=True)
         raise
 
 
@@ -68,7 +118,6 @@ def extract_ingredients_from_caption(caption: str) -> List[str]:
     Returns:
         List of detected ingredients
     """
-    # Common food-related stop words to filter out
     stop_words = {
         'a', 'an', 'the', 'and', 'or', 'of', 'in', 'on', 'with', 'at', 'to',
         'photo', 'picture', 'image', 'plate', 'bowl', 'table', 'dish', 'food',
@@ -76,7 +125,6 @@ def extract_ingredients_from_caption(caption: str) -> List[str]:
         'fresh', 'some', 'many', 'few', 'several', 'various', 'different'
     }
     
-    # Common ingredient patterns and their normalized forms
     ingredient_mapping = {
         'tomato': ['tomato', 'tomatoes'],
         'onion': ['onion', 'onions'],
@@ -128,27 +176,89 @@ def extract_ingredients_from_caption(caption: str) -> List[str]:
         'rosemary': ['rosemary'],
     }
     
-    # Clean and tokenize caption
     caption_lower = caption.lower()
-    # Remove punctuation and split
     words = re.findall(r'\b[a-z]+\b', caption_lower)
     
     detected_ingredients: Set[str] = set()
     
-    # Check for ingredient patterns
     for base_ingredient, variants in ingredient_mapping.items():
         for variant in variants:
             if variant in caption_lower:
                 detected_ingredients.add(base_ingredient)
                 break
     
-    # If no ingredients found using mapping, try extracting nouns
     if not detected_ingredients:
         for word in words:
             if word not in stop_words and len(word) > 3:
                 detected_ingredients.add(word)
     
     return sorted(list(detected_ingredients))
+
+
+def detect_with_clip(image: Image.Image) -> Dict[str, Any]:
+    """
+    Use CLIP to detect ingredients, cuisine, and dish type
+    
+    Args:
+        image: PIL Image object
+    
+    Returns:
+        Dictionary with detected ingredients, cuisine, and dish type
+    """
+    results = {}
+    
+    try:
+        logger.info("CLIP: Detecting ingredients...")
+        inputs = clip_processor(text=INGREDIENTS_LIST, images=image, return_tensors="pt", padding=True).to(device)
+        outputs = clip_model(**inputs)
+        logits_per_image = outputs.logits_per_image
+        probs = logits_per_image.softmax(dim=1)[0]
+        
+        ingredient_scores = [(INGREDIENTS_LIST[i], float(probs[i])) for i in range(len(INGREDIENTS_LIST))]
+        ingredient_scores.sort(key=lambda x: x[1], reverse=True)
+        
+        detected_ingredients = [name for name, score in ingredient_scores if score > 0.20]
+        ingredient_confidences = {name: score for name, score in ingredient_scores if score > 0.20}
+        
+        logger.info(f"CLIP: Detected {len(detected_ingredients)} ingredients")
+        
+        logger.info("CLIP: Detecting cuisine...")
+        inputs = clip_processor(text=CUISINE_LIST, images=image, return_tensors="pt", padding=True).to(device)
+        outputs = clip_model(**inputs)
+        cuisine_probs = outputs.logits_per_image.softmax(dim=1)[0]
+        cuisine_idx = int(cuisine_probs.argmax())
+        cuisine_confidence = float(cuisine_probs[cuisine_idx])
+        
+        logger.info("CLIP: Detecting dish type...")
+        inputs = clip_processor(text=DISH_TYPES, images=image, return_tensors="pt", padding=True).to(device)
+        outputs = clip_model(**inputs)
+        dish_probs = outputs.logits_per_image.softmax(dim=1)[0]
+        dish_idx = int(dish_probs.argmax())
+        dish_confidence = float(dish_probs[dish_idx])
+        
+        results = {
+            "ingredients": detected_ingredients[:10],
+            "ingredient_confidences": ingredient_confidences,
+            "cuisine": CUISINE_LIST[cuisine_idx],
+            "cuisine_confidence": cuisine_confidence,
+            "dish_type": DISH_TYPES[dish_idx],
+            "dish_confidence": dish_confidence,
+        }
+        
+        logger.info(f"CLIP: Cuisine={results['cuisine']}, Dish={results['dish_type']}")
+        
+    except Exception as e:
+        logger.error(f"CLIP detection error: {str(e)}", exc_info=True)
+        results = {
+            "ingredients": [],
+            "ingredient_confidences": {},
+            "cuisine": "Unknown",
+            "cuisine_confidence": 0.0,
+            "dish_type": "Unknown",
+            "dish_confidence": 0.0,
+        }
+    
+    return results
 
 
 @app.on_event("startup")
@@ -173,8 +283,10 @@ async def health():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "model_loaded": model is not None,
-        "processor_loaded": processor is not None,
+        "blip_model_loaded": blip_model is not None,
+        "blip_processor_loaded": blip_processor is not None,
+        "clip_model_loaded": clip_model is not None,
+        "clip_processor_loaded": clip_processor is not None,
         "device": str(device)
     }
 
@@ -183,22 +295,22 @@ async def health():
 @app.post("/detect-ingredients")
 async def detect_ingredients(file: UploadFile = File(...)):
     """
-    Detect ingredients from an uploaded image
+    Detect ingredients from an uploaded image using both BLIP and CLIP
     
     Args:
         file: Uploaded image file (JPEG, PNG, etc.)
     
     Returns:
-        JSON with detected ingredients list, caption, and confidence
+        JSON with detected ingredients list, cuisine, dish type, caption, and confidence
     """
     try:
         logger.info(f"Received request - filename: {file.filename}, content_type: {file.content_type}")
         
-        if model is None or processor is None:
-            logger.error("Model not loaded!")
+        if blip_model is None or blip_processor is None or clip_model is None or clip_processor is None:
+            logger.error("Models not loaded!")
             raise HTTPException(
                 status_code=503,
-                detail="Model is still loading. Please wait a moment and try again."
+                detail="Models are still loading. Please wait a moment and try again."
             )
         
         if not file.content_type or not file.content_type.startswith('image/'):
@@ -221,33 +333,56 @@ async def detect_ingredients(file: UploadFile = File(...)):
         image = Image.open(io.BytesIO(contents)).convert('RGB')
         logger.info(f"Image opened successfully - size: {image.size}")
         
-        logger.info("Processing with BLIP model...")
-        inputs = processor(image, return_tensors="pt").to(device)
+        # Use CLIP for structured detection
+        logger.info("Running CLIP detection...")
+        clip_results = detect_with_clip(image)
         
-        logger.info("Generating caption...")
+        # Use BLIP for caption generation
+        logger.info("Generating caption with BLIP...")
+        inputs = blip_processor(image, return_tensors="pt").to(device)
+        
         with torch.no_grad():
-            out = model.generate(**inputs, max_length=50)
+            out = blip_model.generate(**inputs, max_length=50)
         
-        caption = processor.decode(out[0], skip_special_tokens=True)
+        caption = blip_processor.decode(out[0], skip_special_tokens=True)
         logger.info(f"Generated caption: {caption}")
         
-        # Extract ingredients from caption
-        logger.info("Extracting ingredients...")
-        ingredients = extract_ingredients_from_caption(caption)
-        logger.info(f"Extracted ingredients: {ingredients}")
+        ingredients = clip_results["ingredients"]
         
-        confidence = 0.85 if len(caption.split()) > 3 else 0.7
+        if len(ingredients) < 3:
+            logger.info("Supplementing with caption-based ingredients...")
+            caption_ingredients = extract_ingredients_from_caption(caption)
+            for ing in caption_ingredients:
+                if ing not in ingredients:
+                    ingredients.append(ing)
+        
+        logger.info(f"Final ingredients: {ingredients}")
+        
+        avg_confidence = (
+            clip_results["cuisine_confidence"] + 
+            clip_results["dish_confidence"]
+        ) / 2.0
         
         response = {
             "success": True,
             "ingredients": ingredients,
+            "cuisine": clip_results["cuisine"],
+            "dish_type": clip_results["dish_type"],
             "caption": caption,
-            "confidence": confidence,
-            "model": "Salesforce/blip-image-captioning-base",
+            "confidence": round(avg_confidence, 2),
+            "details": {
+                "ingredient_confidences": clip_results["ingredient_confidences"],
+                "cuisine_confidence": round(clip_results["cuisine_confidence"], 2),
+                "dish_confidence": round(clip_results["dish_confidence"], 2),
+            },
+            "model": {
+                "clip": "openai/clip-vit-base-patch32",
+                "blip": "Salesforce/blip-image-captioning-base"
+            },
             "device": str(device)
         }
         
-        logger.info(f"Successfully processed image with {len(ingredients)} ingredients")
+        logger.info(f"Successfully processed image with {len(ingredients)} ingredients, cuisine: {clip_results['cuisine']}, dish: {clip_results['dish_type']}")
         return response
         
     except HTTPException as he:

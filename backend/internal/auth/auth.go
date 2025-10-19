@@ -16,7 +16,7 @@ import (
 // Claims represents the JWT token payload containing user identification
 // and standard JWT claims (expiration, issued at, etc.).
 type Claims struct {
-	UserID int `json:"userId"` // User ID embedded in the token
+	UserID int `json:"userId"`
 	jwt.RegisteredClaims
 }
 
