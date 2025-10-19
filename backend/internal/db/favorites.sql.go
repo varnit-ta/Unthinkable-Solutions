@@ -56,7 +56,7 @@ const listFavoritesByUser = `-- name: ListFavoritesByUser :many
 SELECT f.id as favorite_id, f.user_id, f.recipe_id, f.created_at, 
   r.title, r.description, r.cuisine, r.difficulty, r.diet_type, 
   r.prep_time_minutes, r.cook_time_minutes, r.total_time_minutes, r.servings,
-  (SELECT ROUND(AVG(rating)::numeric, 1) FROM ratings WHERE recipe_id = r.id) as average_rating
+  COALESCE((SELECT ROUND(AVG(rating)::numeric, 1) FROM ratings WHERE recipe_id = r.id)::text, '0') as average_rating
 FROM favorites f
 JOIN recipes r ON r.id = f.recipe_id
 WHERE f.user_id = $1
@@ -77,7 +77,7 @@ type ListFavoritesByUserRow struct {
 	CookTimeMinutes  sql.NullInt32  `json:"cook_time_minutes"`
 	TotalTimeMinutes sql.NullInt32  `json:"total_time_minutes"`
 	Servings         sql.NullInt32  `json:"servings"`
-	AverageRating    string         `json:"average_rating"`
+	AverageRating    interface{}    `json:"average_rating"`
 }
 
 func (q *Queries) ListFavoritesByUser(ctx context.Context, userID sql.NullInt32) ([]ListFavoritesByUserRow, error) {

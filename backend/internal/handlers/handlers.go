@@ -138,7 +138,6 @@ func (h *Handler) Match(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "bad request"})
 		return
 	}
-	// optional filters via query
 	diet := r.URL.Query().Get("diet")
 	difficulty := r.URL.Query().Get("difficulty")
 	cuisine := r.URL.Query().Get("cuisine")
@@ -171,7 +170,6 @@ func (h *Handler) Match(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
-	// Convert to response format
 	type RecipeWithScoreResponse struct {
 		RecipeDetailResponse
 		Score int `json:"score"`
@@ -509,7 +507,6 @@ func (h *Handler) GetSuggestions(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]string{"message": "server error"})
 		return
 	}
-	// Convert to response format
 	type RecipeWithScoreResponse struct {
 		RecipeDetailResponse
 		Score int `json:"score"`

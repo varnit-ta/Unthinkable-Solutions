@@ -175,6 +175,6 @@ func toFavoriteRecipeResponse(row db.ListFavoritesByUserRow) FavoriteRecipeRespo
 		CookTimeMinutes:  int(nullInt32Value(row.CookTimeMinutes)),
 		TotalTimeMinutes: int(nullInt32Value(row.TotalTimeMinutes)),
 		Servings:         int(nullInt32Value(row.Servings)),
-		AverageRating:    row.AverageRating,
+		AverageRating:    interfaceToString(row.AverageRating),
 	}
 }

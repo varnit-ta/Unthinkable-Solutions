@@ -25,5 +25,34 @@ sqlc generate
 go run ./cmd/server
 ```
 
-Environment
-- `DATABASE_URL` (optional) — Postgres connection string. Default used in `main.go` is `postgres://unthinkable:unthinkable@localhost:5432/unthinkable_recipes?sslmode=disable`.
+Environment Variables
+- `DATABASE_URL` (optional) — Postgres connection string. Default: `postgres://unthinkable:unthinkable@localhost:5432/unthinkable_recipes?sslmode=disable`.
+- `PORT` (optional) — HTTP server port. Default: `8081`.
+- `JWT_SECRET` (optional) — Secret key for JWT signing. Default: `change-me-to-a-secure-secret`.
+- `HUGGINGFACE_TOKEN` (optional) — Hugging Face API token for ingredient detection. See [HUGGINGFACE_SETUP.md](./HUGGINGFACE_SETUP.md) for setup instructions.
+- `HUGGINGFACE_MODEL` (optional) — Hugging Face model ID. Default: `Salesforce/blip-image-captioning-large`.
+- `AI_SERVICE_URL` (optional) — URL for local Python AI service. Default: `http://localhost:8000`.
+
+## AI Service Configuration
+
+The backend supports two options for ingredient detection from images:
+
+### Option 1: Hugging Face (Recommended) ✨
+
+Use Hugging Face's free Inference API - no local setup needed!
+
+1. Get a free API token from [huggingface.co](https://huggingface.co/settings/tokens)
+2. Set environment variable: `HUGGINGFACE_TOKEN=hf_your_token_here`
+3. Start the backend
+
+See [HUGGINGFACE_SETUP.md](./HUGGINGFACE_SETUP.md) for detailed setup instructions.
+
+### Option 2: Local AI Service
+
+Use the local Python service (requires Docker):
+
+```cmd
+docker-compose up ai-service
+```
+
+The backend automatically uses Hugging Face if `HUGGINGFACE_TOKEN` is set, otherwise falls back to the local service.

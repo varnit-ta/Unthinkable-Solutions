@@ -11,19 +11,21 @@ import (
 // Config holds all application configuration settings loaded from environment variables.
 // Each field has a corresponding environment variable and default value.
 type Config struct {
-	DatabaseURL       string        // PostgreSQL connection string (DATABASE_URL)
-	Port              string        // HTTP server port (PORT, default: 8081)
-	JWTSecret         string        // Secret key for JWT signing (JWT_SECRET)
-	JWTExpiryHours    int           // JWT token expiration in hours (default: 48)
-	DBMaxOpenConns    int           // Maximum open database connections (DB_MAX_OPEN_CONNS, default: 20)
-	DBMaxIdleConns    int           // Maximum idle database connections (DB_MAX_IDLE_CONNS, default: 10)
-	DBConnMaxIdle     time.Duration // Maximum connection idle time (DB_CONN_MAX_IDLE, default: 15m)
-	DBConnMaxLife     time.Duration // Maximum connection lifetime (DB_CONN_MAX_LIFE, default: 1h)
-	DBRetryMax        int           // Maximum database connection retry attempts (DB_RETRY_MAX, default: 8)
-	DBRetryBackoff    time.Duration // Initial retry backoff duration (DB_RETRY_BACKOFF, default: 500ms)
-	HuggingFaceAPIKey string        // Hugging Face API key for vision AI (HUGGINGFACE_API_KEY)
-	MaxImageSizeMB    int           // Maximum image upload size in MB (MAX_IMAGE_SIZE_MB, default: 10)
-	AllowedOrigins    string        // Comma-separated list of allowed CORS origins (ALLOWED_ORIGINS)
+	DatabaseURL      string        // PostgreSQL connection string (DATABASE_URL)
+	Port             string        // HTTP server port (PORT, default: 8081)
+	JWTSecret        string        // Secret key for JWT signing (JWT_SECRET)
+	JWTExpiryHours   int           // JWT token expiration in hours (default: 48)
+	DBMaxOpenConns   int           // Maximum open database connections (DB_MAX_OPEN_CONNS, default: 20)
+	DBMaxIdleConns   int           // Maximum idle database connections (DB_MAX_IDLE_CONNS, default: 10)
+	DBConnMaxIdle    time.Duration // Maximum connection idle time (DB_CONN_MAX_IDLE, default: 15m)
+	DBConnMaxLife    time.Duration // Maximum connection lifetime (DB_CONN_MAX_LIFE, default: 1h)
+	DBRetryMax       int           // Maximum database connection retry attempts (DB_RETRY_MAX, default: 8)
+	DBRetryBackoff   time.Duration // Initial retry backoff duration (DB_RETRY_BACKOFF, default: 500ms)
+	AIServiceURL     string        // URL for the Python AI service (AI_SERVICE_URL, default: http://localhost:8000)
+	HuggingFaceToken string        // Hugging Face API token (HUGGINGFACE_TOKEN)
+	HuggingFaceModel string        // Hugging Face model ID (HUGGINGFACE_MODEL, default: Salesforce/blip-image-captioning-large)
+	MaxImageSizeMB   int           // Maximum image upload size in MB (MAX_IMAGE_SIZE_MB, default: 10)
+	AllowedOrigins   string        // Comma-separated list of allowed CORS origins (ALLOWED_ORIGINS)
 }
 
 // Load reads configuration from environment variables and returns a Config struct
@@ -50,7 +52,17 @@ func Load() Config {
 	retryMax := parseIntEnv("DB_RETRY_MAX", 8)
 	retryBackoff := parseDurationEnv("DB_RETRY_BACKOFF", 500*time.Millisecond)
 
-	hfAPIKey := os.Getenv("HUGGINGFACE_API_KEY")
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://localhost:8000"
+	}
+
+	huggingFaceToken := os.Getenv("HUGGINGFACE_TOKEN")
+	huggingFaceModel := os.Getenv("HUGGINGFACE_MODEL")
+	if huggingFaceModel == "" {
+		huggingFaceModel = "Salesforce/blip-image-captioning-large"
+	}
+
 	maxImageSize := parseIntEnv("MAX_IMAGE_SIZE_MB", 10)
 
 	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
@@ -59,19 +71,21 @@ func Load() Config {
 	}
 
 	return Config{
-		DatabaseURL:       db,
-		Port:              port,
-		JWTSecret:         secret,
-		JWTExpiryHours:    expiry,
-		DBMaxOpenConns:    maxOpen,
-		DBMaxIdleConns:    maxIdle,
-		DBConnMaxIdle:     idle,
-		DBConnMaxLife:     life,
-		DBRetryMax:        retryMax,
-		DBRetryBackoff:    retryBackoff,
-		HuggingFaceAPIKey: hfAPIKey,
-		MaxImageSizeMB:    maxImageSize,
-		AllowedOrigins:    allowedOrigins,
+		DatabaseURL:      db,
+		Port:             port,
+		JWTSecret:        secret,
+		JWTExpiryHours:   expiry,
+		DBMaxOpenConns:   maxOpen,
+		DBMaxIdleConns:   maxIdle,
+		DBConnMaxIdle:    idle,
+		DBConnMaxLife:    life,
+		DBRetryMax:       retryMax,
+		DBRetryBackoff:   retryBackoff,
+		AIServiceURL:     aiServiceURL,
+		HuggingFaceToken: huggingFaceToken,
+		HuggingFaceModel: huggingFaceModel,
+		MaxImageSizeMB:   maxImageSize,
+		AllowedOrigins:   allowedOrigins,
 	}
 }
 

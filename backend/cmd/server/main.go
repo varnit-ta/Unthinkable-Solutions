@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/cors"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 
 	"github.com/varnit-ta/smart-recipe-generator/backend/internal/config"
@@ -31,6 +32,8 @@ import (
 // 6. Configure HTTP router with middleware and routes
 // 7. Start HTTP server
 func main() {
+	_ = godotenv.Load()
+
 	cfg := config.Load()
 
 	db, err := sql.Open("postgres", cfg.DatabaseURL)
@@ -79,7 +82,7 @@ func connectToDatabase(db *sql.DB, cfg config.Config) {
 			log.Printf("connected to db")
 			break
 		}
-		wait := backoff << i // exponential backoff
+		wait := backoff << i
 		if wait > 5*time.Second {
 			wait = 5 * time.Second
 		}
@@ -111,32 +114,43 @@ func initializeServices(db *sql.DB, cfg config.Config) {
 }
 
 // setupVisionService initializes the AI vision service for ingredient detection.
-// Returns nil if API key is not configured.
+// Priority order:
+// 1. Local AI service (if AI_SERVICE_URL is set) - preferred for better ingredient extraction
+// 2. Hugging Face API (if HUGGINGFACE_TOKEN is set)
+// Returns nil if no service is configured.
 func setupVisionService(cfg config.Config) vision.VisionService {
-	var visionService vision.VisionService
-	if cfg.HuggingFaceAPIKey != "" {
-		visionService = vision.NewHuggingFaceService(cfg.HuggingFaceAPIKey)
-		log.Printf("Hugging Face vision service initialized")
-	} else {
-		log.Printf("WARNING: HUGGINGFACE_API_KEY not set - vision detection will not work")
+	// Prefer local AI service (has better ingredient extraction)
+	if cfg.AIServiceURL != "" {
+		log.Printf("✅ Local AI service configured at: %s", cfg.AIServiceURL)
+		return vision.NewLocalAIService(cfg.AIServiceURL)
 	}
-	return visionService
+
+	// Fall back to Hugging Face if token is provided
+	if cfg.HuggingFaceToken != "" {
+		log.Printf("✅ Hugging Face AI service configured with model: %s", cfg.HuggingFaceModel)
+		return vision.NewHuggingFaceService(cfg.HuggingFaceToken, cfg.HuggingFaceModel)
+	}
+
+	log.Printf("❌ WARNING: No AI service configured - ingredient detection disabled")
+	log.Printf("💡 Set AI_SERVICE_URL env var to use local AI service (recommended)")
+	log.Printf("💡 Or set HUGGINGFACE_TOKEN env var to use Hugging Face API")
+	log.Printf("💡 Start local AI service with: docker-compose up ai-service")
+	return nil
 }
 
 // setupRouter configures the HTTP router with middleware, CORS, and all application routes.
 func setupRouter(cfg config.Config, h *handlers.Handler, authH *handlers.AuthHandler) *chi.Mux {
 	r := chi.NewRouter()
 
-	// Parse allowed origins from config (comma-separated string)
 	allowedOrigins := strings.Split(cfg.AllowedOrigins, ",")
 	for i := range allowedOrigins {
 		allowedOrigins[i] = strings.TrimSpace(allowedOrigins[i])
 	}
 
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"*"},
+		AllowedOrigins:   []string{"http://localhost:3000", "http://localhost:5173", "http://localhost:8080", "*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token", "X-Requested-With"},
 		ExposedHeaders:   []string{"Link"},
 		AllowCredentials: true,
 		MaxAge:           300,

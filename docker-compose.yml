@@ -14,6 +14,20 @@ services:
     ports:
       - "5432:5432"
 
+  ai-service:
+    build:
+      context: ./ai-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
   backend:
     build:
       context: ./backend
@@ -23,10 +37,11 @@ services:
       DATABASE_URL: ${DATABASE_URL:-postgres://unthinkable:unthinkable@db:5432/unthinkable_recipes?sslmode=disable}
       PORT: ${PORT:-8081}
       JWT_SECRET: ${JWT_SECRET:-change-me-to-a-secure-secret}
-      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-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}
+      AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai-service:8000}
       MAX_IMAGE_SIZE_MB: ${MAX_IMAGE_SIZE_MB:-10}
     depends_on:
       - db
+      - ai-service
     ports:
       - "8081:8081"
 
