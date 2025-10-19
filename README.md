@@ -32,14 +32,26 @@ cd Unthinkable-Solutions
 
 2. **Setup environment variables**
 
-Create `backend/.env`:
+Create `.env` in the root directory:
 ```env
-DATABASE_URL=postgres://unthinkable:unthinkable@localhost:5432/unthinkable_recipes?sslmode=disable
-PORT=8081
-JWT_SECRET=your-secret-key
+# Database Configuration
+DATABASE_URL=postgres://unthinkable:unthinkable@db:5432/unthinkable_recipes?sslmode=disable
+POSTGRES_USER=unthinkable
+POSTGRES_PASSWORD=unthinkable
+POSTGRES_DB=unthinkable_recipes
 
-# Local AI Service URL (no API key needed!)
-AI_SERVICE_URL=http://localhost:8000
+# Backend Configuration
+PORT=8081
+JWT_SECRET=change-me-to-a-secure-secret
+
+# AI Service Configuration (runs locally, no API key needed!)
+AI_SERVICE_URL=http://ai-service:8000
+
+# Image Processing
+MAX_IMAGE_SIZE_MB=10
+
+# CORS Configuration
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3000,http://localhost:4173
 ```
 
 3. **Start with Docker Compose** (Recommended)
@@ -69,11 +81,21 @@ npm run dev
 
 ## 🎯 AI Image Detection Setup
 
-**Local Python AI Service (No API Key Required!)**
+**Local Python AI Service (No API Key Required!)** ✨
 1. The AI service runs automatically with Docker Compose
 2. Uses Salesforce BLIP model for ingredient detection
 3. Model downloads automatically on first run (~990MB)
 4. Fast local inference - no external API calls!
+5. Configured via `AI_SERVICE_URL` environment variable
+
+**Architecture:**
+```
+Frontend → Go Backend → Python AI Service (FastAPI + BLIP)
+```
+
+**Configuration:**
+- **Docker Compose**: `AI_SERVICE_URL=http://ai-service:8000` (default)
+- **Local Development**: `AI_SERVICE_URL=http://localhost:8000`
 
 **Manual Setup** (if not using Docker):
 ```bash
@@ -83,10 +105,6 @@ python main.py
 ```
 
 See `ai-service/README.md` for detailed documentation.
-
-**Alternative**: Hugging Face (FREE - limited tier)
-- Get API key at: https://huggingface.co/settings/tokens
-- Add to `.env`: `HUGGINGFACE_API_KEY=hf_xxx`
 
 Upload ingredient images and watch the magic! ✨
 
@@ -138,29 +156,6 @@ cd frontend
 npm test
 ```
 
-## 📦 Project Structure
-
-```
-.
-├── backend/
-│   ├── cmd/server/          # Application entry point
-│   ├── internal/
-│   │   ├── auth/           # Authentication logic
-│   │   ├── config/         # Configuration
-│   │   ├── db/             # Database queries (SQLC)
-│   │   ├── handlers/       # HTTP handlers
-│   │   ├── middleware/     # Auth & logging middleware
-│   │   ├── service/        # Business logic
-│   │   └── vision/         # AI image detection 🆕
-│   └── migrations/         # Database migrations
-├── frontend/
-│   └── src/
-│       ├── components/     # Reusable UI components
-│       ├── pages/          # Page components
-│       └── api.ts          # API client
-└── docker-compose.yml      # Docker orchestration
-```
-
 ## 🌟 Key Features Explained
 
 ### AI Ingredient Detection
@@ -181,23 +176,3 @@ Once ingredients are detected (or manually entered), the app finds recipes that:
 
 ### Personalized Suggestions
 The app learns from your favorites and ratings to suggest recipes you'll love.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
-
-## 📄 License
-
-MIT License
-
-## 👨‍💻 Author
-
-Created by [Varnit TA](https://github.com/varnit-ta)
-
----
-
-**Need help?** Open an issue or check the documentation!

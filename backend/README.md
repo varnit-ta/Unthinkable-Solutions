@@ -29,30 +29,38 @@ Environment Variables
 - `DATABASE_URL` (optional) — Postgres connection string. Default: `postgres://unthinkable:unthinkable@localhost:5432/unthinkable_recipes?sslmode=disable`.
 - `PORT` (optional) — HTTP server port. Default: `8081`.
 - `JWT_SECRET` (optional) — Secret key for JWT signing. Default: `change-me-to-a-secure-secret`.
-- `HUGGINGFACE_TOKEN` (optional) — Hugging Face API token for ingredient detection. See [HUGGINGFACE_SETUP.md](./HUGGINGFACE_SETUP.md) for setup instructions.
-- `HUGGINGFACE_MODEL` (optional) — Hugging Face model ID. Default: `Salesforce/blip-image-captioning-large`.
-- `AI_SERVICE_URL` (optional) — URL for local Python AI service. Default: `http://localhost:8000`.
+- `AI_SERVICE_URL` (required) — URL for local Python AI service. Default: `http://localhost:8000`. Use `http://ai-service:8000` in Docker.
+- `MAX_IMAGE_SIZE_MB` (optional) — Maximum image upload size in MB. Default: `10`.
+- `ALLOWED_ORIGINS` (optional) — Comma-separated list of allowed CORS origins. Default includes localhost ports.
 
 ## AI Service Configuration
 
-The backend supports two options for ingredient detection from images:
+The backend connects to a local Python AI service for ingredient detection from images.
 
-### Option 1: Hugging Face (Recommended) ✨
+### Configuration
 
-Use Hugging Face's free Inference API - no local setup needed!
+Set the AI service URL via environment variable:
 
-1. Get a free API token from [huggingface.co](https://huggingface.co/settings/tokens)
-2. Set environment variable: `HUGGINGFACE_TOKEN=hf_your_token_here`
-3. Start the backend
+```env
+# For Docker Compose (service name)
+AI_SERVICE_URL=http://ai-service:8000
 
-See [HUGGINGFACE_SETUP.md](./HUGGINGFACE_SETUP.md) for detailed setup instructions.
+# For local development
+AI_SERVICE_URL=http://localhost:8000
+```
 
-### Option 2: Local AI Service
+### Starting the AI Service
 
-Use the local Python service (requires Docker):
-
+**With Docker Compose (Recommended):**
 ```cmd
 docker-compose up ai-service
 ```
 
-The backend automatically uses Hugging Face if `HUGGINGFACE_TOKEN` is set, otherwise falls back to the local service.
+**Standalone:**
+```cmd
+cd ai-service
+pip install -r requirements.txt
+python main.py
+```
+
+The backend will automatically connect to the AI service at the configured URL.
