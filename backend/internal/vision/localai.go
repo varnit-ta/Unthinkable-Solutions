@@ -53,7 +53,7 @@ type AIServiceResponse struct {
 	Caption     string                 `json:"caption"`
 	Confidence  float64                `json:"confidence"`
 	Details     map[string]interface{} `json:"details,omitempty"`
-	Model       map[string]string      `json:"model,omitempty"`
+	Model       interface{}            `json:"model,omitempty"`
 	Device      string                 `json:"device"`
 }
 
@@ -144,8 +144,21 @@ func (s *LocalAIService) DetectIngredients(ctx context.Context, imageData []byte
 
 	modelInfo := "local-ai"
 	if aiResp.Model != nil {
-		if clipModel, ok := aiResp.Model["clip"]; ok {
-			modelInfo = clipModel
+		switch v := aiResp.Model.(type) {
+		case map[string]interface{}:
+			if clipModel, ok := v["clip"].(string); ok {
+				modelInfo = clipModel
+			} else if blipModel, ok := v["blip"].(string); ok {
+				modelInfo = blipModel
+			}
+		case map[string]string:
+			if clipModel, ok := v["clip"]; ok {
+				modelInfo = clipModel
+			} else if blipModel, ok := v["blip"]; ok {
+				modelInfo = blipModel
+			}
+		case string:
+			modelInfo = v
 		}
 	}
 
